@@ -200,7 +200,10 @@ function buildVideoGenerationSections(model: VideoGenerationModel): any[] {
             type: 'text',
             description: 'Public URL of the source image for image-to-video',
             required: true,
-            placeholder: 'https://example.com/your-image.jpg'
+            placeholder: 'https://example.com/your-image.jpg',
+            validation: {
+                pattern: '^https?://'
+            }
         });
     }
 
