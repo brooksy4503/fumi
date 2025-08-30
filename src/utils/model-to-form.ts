@@ -240,6 +240,18 @@ function buildVideoGenerationSections(model: VideoGenerationModel): any[] {
             })),
             defaultValue: model.supportedInputs.durations[0]
         });
+    } else {
+        // Fallback numeric duration if model doesn't enumerate durations
+        basicFields.push({
+            id: 'duration',
+            label: 'Duration (seconds)',
+            type: 'number',
+            description: 'Length in seconds; typical range 1-6',
+            min: 1,
+            max: 6,
+            step: 1,
+            defaultValue: 4
+        });
     }
 
     if (basicFields.length > 0) {

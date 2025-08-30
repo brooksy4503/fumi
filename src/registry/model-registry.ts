@@ -226,7 +226,7 @@ const staticRegistry: Record<string, ModelMetadata> = {
             videoPrompt: false,
             imagePrompt: true,
             negativePrompt: false,
-            durations: [4, 5],
+            durations: [],
             dimensions: true,
             aspectRatios: ['16:9'],
             fps: [10, 15],
@@ -263,7 +263,7 @@ const staticRegistry: Record<string, ModelMetadata> = {
             videoPrompt: false,
             imagePrompt: true,
             negativePrompt: false,
-            durations: [4, 5],
+            durations: [],
             dimensions: true,
             aspectRatios: ['16:9'],
             fps: [10, 15],
@@ -414,7 +414,7 @@ export async function getDefaultParams(id: string): Promise<Partial<ModelInput> 
             const videoModel = model as unknown as VideoGenerationModel;
             const defaultDuration = (videoModel.supportedInputs?.durations && videoModel.supportedInputs.durations.length > 0)
                 ? videoModel.supportedInputs.durations[0]
-                : 5;
+                : 4;
             const defaultFps = (videoModel.supportedInputs?.fps && videoModel.supportedInputs.fps.length > 0)
                 ? videoModel.supportedInputs.fps[0]
                 : 10;
