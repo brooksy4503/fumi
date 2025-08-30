@@ -281,7 +281,13 @@ export async function POST(request: Request) {
           const cleanInput: any = {};
           if (finalInput.image_url) cleanInput.image_url = finalInput.image_url;
           if (finalInput.fps) cleanInput.fps = Number(finalInput.fps);
-          if (finalInput.duration) cleanInput.duration = Number(finalInput.duration);
+          // Map duration to frames if provided (Stable Video often uses num_frames)
+          if (finalInput.duration) {
+            const fps = cleanInput.fps || 10;
+            const seconds = Number(finalInput.duration);
+            const frames = Math.max(14, Math.min(75, Math.round(fps * seconds)));
+            cleanInput.num_frames = frames;
+          }
           if (finalInput.loop !== undefined) cleanInput.loop = !!finalInput.loop;
           if (finalInput.seed !== undefined) cleanInput.seed = Number(finalInput.seed);
           finalInput = cleanInput;
