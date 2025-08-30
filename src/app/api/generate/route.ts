@@ -330,7 +330,31 @@ export async function POST(request: Request) {
             logs: true,
           });
         } catch (secondError) {
-          throw firstError;
+          // Second attempt: use frame_rate alias instead of fps
+          const retryInput2: any = {
+            image_url: finalInput.image_url,
+            frame_rate: 10,
+            num_frames: 48,
+          };
+          try {
+            result = await fal.subscribe(actualModelId, {
+              input: retryInput2,
+              logs: true,
+            });
+          } catch (thirdError) {
+            // Final attempt: only image_url
+            const retryInput3: any = {
+              image_url: finalInput.image_url,
+            };
+            try {
+              result = await fal.subscribe(actualModelId, {
+                input: retryInput3,
+                logs: true,
+              });
+            } catch {
+              throw firstError;
+            }
+          }
         }
       } else {
         throw firstError;
