@@ -197,7 +197,8 @@ export async function POST(request: Request) {
       ...normalizedInputs,
       // Ensure required fields are present based on model category
       ...(model.category === 'image-generation' && !normalizedInputs.prompt && { prompt: 'default image prompt' }),
-      ...(model.category === 'video-generation' && !normalizedInputs.prompt && { prompt: 'default video prompt' }),
+      // For video models that require an image, do not inject a prompt
+      ...(model.category === 'video-generation' && (model as any).supportedInputs?.textPrompt && !normalizedInputs.prompt && { prompt: 'default video prompt' }),
       ...(model.category === 'text-to-speech' && !normalizedInputs.text && { text: 'default text to speech' }),
       ...(model.category === 'audio-generation' && !normalizedInputs.prompt && { prompt: 'default audio prompt' })
     };
@@ -266,6 +267,17 @@ export async function POST(request: Request) {
       if (model.category === 'image-generation') {
         // Keep only valid image generation parameters
         const validParams = ['prompt', 'width', 'height', 'num_images', 'guidance_scale', 'num_inference_steps', 'seed', 'quality', 'format'];
+        const cleanInput: any = {};
+        validParams.forEach(param => {
+          if (finalInput[param] !== undefined) {
+            cleanInput[param] = finalInput[param];
+          }
+        });
+        finalInput = cleanInput;
+      }
+      if (model.category === 'video-generation') {
+        // Keep only valid video generation parameters; include image_url if provided
+        const validParams = ['prompt', 'duration', 'width', 'height', 'fps', 'seed', 'loop', 'aspect_ratio', 'image_url', 'video_url'];
         const cleanInput: any = {};
         validParams.forEach(param => {
           if (finalInput[param] !== undefined) {

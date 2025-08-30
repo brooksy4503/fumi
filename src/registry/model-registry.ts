@@ -410,17 +410,23 @@ export async function getDefaultParams(id: string): Promise<Partial<ModelInput> 
                 quality: 'standard',
                 format: 'png',
             };
-        case 'video-generation':
+        case 'video-generation': {
+            const videoModel = model as unknown as VideoGenerationModel;
+            const defaultDuration = (videoModel.supportedInputs?.durations && videoModel.supportedInputs.durations.length > 0)
+                ? videoModel.supportedInputs.durations[0]
+                : 5;
+            const defaultFps = (videoModel.supportedInputs?.fps && videoModel.supportedInputs.fps.length > 0)
+                ? videoModel.supportedInputs.fps[0]
+                : 10;
             return {
-                duration: 5,
+                duration: defaultDuration,
                 width: 1024,
                 height: 576,
-                fps: 10,
+                fps: defaultFps,
                 numVideos: 1,
-                guidanceScale: 7.5,
-                numInferenceSteps: 20,
                 quality: 'standard',
             };
+        }
         case 'text-to-speech':
             return {
                 speed: 1.0,
