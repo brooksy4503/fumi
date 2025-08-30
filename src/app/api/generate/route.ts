@@ -308,10 +308,34 @@ export async function POST(request: Request) {
     console.log('Sending request to FAL API with model:', actualModelId);
     console.log('DEBUG: Final parameters being sent to FAL:', JSON.stringify(finalInput, null, 2));
 
-    const result = await fal.subscribe(actualModelId, {
-      input: finalInput,
-      logs: true,
-    });
+    let result: any;
+    try {
+      result = await fal.subscribe(actualModelId, {
+        input: finalInput,
+        logs: true,
+      });
+    } catch (firstError: any) {
+      // Retry strategy for Stable Video endpoints: send conservative defaults
+      const isStableVideo = actualModelId === 'fal-ai/stable-video' || actualModelId === 'fal-ai/stable-video-diffusion';
+      if (isStableVideo && finalInput?.image_url) {
+        console.warn('Stable Video request failed, retrying with conservative defaults');
+        const retryInput: any = {
+          image_url: finalInput.image_url,
+          fps: 10,
+          num_frames: 48,
+        };
+        try {
+          result = await fal.subscribe(actualModelId, {
+            input: retryInput,
+            logs: true,
+          });
+        } catch (secondError) {
+          throw firstError;
+        }
+      } else {
+        throw firstError;
+      }
+    }
 
     const processingTime = Date.now() - startTime;
     console.log('FAL API response received in', processingTime, 'ms');
