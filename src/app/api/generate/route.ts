@@ -276,15 +276,26 @@ export async function POST(request: Request) {
         finalInput = cleanInput;
       }
       if (model.category === 'video-generation') {
-        // Keep only valid video generation parameters; include image_url if provided
-        const validParams = ['prompt', 'duration', 'width', 'height', 'fps', 'seed', 'loop', 'aspect_ratio', 'image_url', 'video_url'];
-        const cleanInput: any = {};
-        validParams.forEach(param => {
-          if (finalInput[param] !== undefined) {
-            cleanInput[param] = finalInput[param];
-          }
-        });
-        finalInput = cleanInput;
+        // Model-specific shaping for Stable Video variants
+        if (actualModelId === 'fal-ai/stable-video' || actualModelId === 'fal-ai/stable-video-diffusion') {
+          const cleanInput: any = {};
+          if (finalInput.image_url) cleanInput.image_url = finalInput.image_url;
+          if (finalInput.fps) cleanInput.fps = Number(finalInput.fps);
+          if (finalInput.duration) cleanInput.duration = Number(finalInput.duration);
+          if (finalInput.loop !== undefined) cleanInput.loop = !!finalInput.loop;
+          if (finalInput.seed !== undefined) cleanInput.seed = Number(finalInput.seed);
+          finalInput = cleanInput;
+        } else {
+          // Generic video param whitelist
+          const validParams = ['prompt', 'duration', 'width', 'height', 'fps', 'seed', 'loop', 'aspect_ratio', 'image_url', 'video_url'];
+          const cleanInput: any = {};
+          validParams.forEach(param => {
+            if (finalInput[param] !== undefined) {
+              cleanInput[param] = finalInput[param];
+            }
+          });
+          finalInput = cleanInput;
+        }
       }
     }
     console.log('Final input parameters:', JSON.stringify(finalInput, null, 2));
