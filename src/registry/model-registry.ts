@@ -229,7 +229,7 @@ const staticRegistry: Record<string, ModelMetadata> = {
             durations: [4, 8],
             dimensions: true,
             aspectRatios: ['16:9'],
-            fps: [8],
+            fps: [10, 15],
         },
         supportedOutputs: {
             formats: ['mp4'],
@@ -266,7 +266,7 @@ const staticRegistry: Record<string, ModelMetadata> = {
             durations: [4, 8],
             dimensions: true,
             aspectRatios: ['16:9'],
-            fps: [8],
+            fps: [10, 15],
         },
         supportedOutputs: {
             formats: ['mp4'],
@@ -415,7 +415,7 @@ export async function getDefaultParams(id: string): Promise<Partial<ModelInput> 
                 duration: 5,
                 width: 1024,
                 height: 576,
-                fps: 8,
+                fps: 10,
                 numVideos: 1,
                 guidanceScale: 7.5,
                 numInferenceSteps: 20,
@@ -505,6 +505,10 @@ export async function validateInput(id: string, input: ModelInput): Promise<{ va
                 if (!vidInput.prompt && !vidInput.imageUrl && !vidInput.image_url && !vidInput.videoUrl && !vidInput.video_url) {
                     errors.push('Provide one of: prompt, imageUrl, or videoUrl');
                 }
+            }
+
+            if (vidInput.fps && Array.isArray(supports.fps) && supports.fps.length > 0 && !supports.fps.includes(Number(vidInput.fps))) {
+                errors.push(`FPS not supported. Available: ${supports.fps.join(', ')}`);
             }
 
             if (vidInput.duration && Array.isArray(supports.durations) && supports.durations.length > 0 && !supports.durations.includes(vidInput.duration)) {
