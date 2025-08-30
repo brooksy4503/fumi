@@ -412,7 +412,7 @@ export async function POST(request: Request) {
       errorDetails.name = error.name;
 
       // Handle FAL API specific errors
-      if (error.name === 'ValidationError' && (error as any).status) {
+      if ((error as any).status) {
         statusCode = (error as any).status;
         errorDetails.falApiError = true;
 
