@@ -87,7 +87,11 @@ export async function POST(request: Request) {
     console.log('Starting dynamic model generation process');
 
     const body = await request.json();
-    const { model: modelId, ...inputParams } = body;
+    const { model: modelId, ...inputParamsRaw } = body;
+    // Support both flat inputs and { input: {...} } payloads
+    const inputParams = (inputParamsRaw && typeof inputParamsRaw.input === 'object')
+      ? { ...inputParamsRaw, ...inputParamsRaw.input }
+      : inputParamsRaw;
 
     // Validate required parameters
     if (!modelId) {
@@ -95,11 +99,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Model ID is required' }, { status: 400 });
     }
 
+    // Normalize model ID if a full Fal model URL was provided
+    let normalizedModelId = modelId;
+    if (typeof modelId === 'string' && modelId.startsWith('http') && modelId.includes('/models/')) {
+      try {
+        const match = modelId.match(/\/models\/([^?#]+)/);
+        if (match && match[1]) {
+          normalizedModelId = decodeURIComponent(match[1]);
+          if (normalizedModelId.endsWith('/api')) {
+            normalizedModelId = normalizedModelId.replace(/\/api$/, '');
+          }
+        }
+      } catch {}
+    }
+
     // Handle common model ID aliases/mismatches
     const modelAliases: { [key: string]: string } = {
-      'flux-pro': 'fal-ai/flux-pro',
-      'flux-schnell': 'fal-ai/flux-schnell',
-      'flux-dev': 'fal-ai/flux-dev',
+      // New FLUX models (short aliases mapping)
+      'flux-pro/kontext': 'fal-ai/flux-pro/kontext',
+      'flux-pro/kontext/api': 'fal-ai/flux-pro/kontext',
+      'flux-pro/v1.1-ultra': 'fal-ai/flux-pro/v1.1-ultra',
+      'flux-pro/v1.1-ultra/api': 'fal-ai/flux-pro/v1.1-ultra',
+      'flux/dev': 'fal-ai/flux/dev',
+      'flux/dev/api': 'fal-ai/flux/dev',
+      // Full path variants extracted from Fal URLs
+      'fal-ai/flux-pro/kontext/api': 'fal-ai/flux-pro/kontext',
+      'fal-ai/flux-pro/v1.1-ultra/api': 'fal-ai/flux-pro/v1.1-ultra',
+      'fal-ai/flux/dev/api': 'fal-ai/flux/dev',
+      // Other models
       'fast-sdxl': 'fal-ai/fast-sdxl',
       'stable-video': 'fal-ai/stable-video',
       'stable-video-diffusion': 'fal-ai/stable-video-diffusion',
@@ -107,13 +134,16 @@ export async function POST(request: Request) {
     };
 
     // Map alias to actual model ID if needed
-    const actualModelId = modelAliases[modelId] || modelId;
+    const actualModelId = modelAliases[normalizedModelId] || normalizedModelId;
 
     console.log('Requested model:', modelId);
-    if (actualModelId !== modelId) {
+    if (normalizedModelId !== modelId) {
+      console.log('Normalized URL model to:', normalizedModelId);
+    }
+    if (actualModelId !== normalizedModelId) {
       console.log('Mapped to model ID:', actualModelId);
     }
-    console.log('Input parameters:', JSON.stringify(inputParams, null, 2));
+    console.log('Input parameters (flattened if nested under input):', JSON.stringify(inputParams, null, 2));
     console.log('DEBUG: Model ID format analysis:');
     console.log('  - Raw modelId:', modelId);
     console.log('  - Contains slash:', modelId.includes('/'));
@@ -207,58 +237,23 @@ export async function POST(request: Request) {
 
     // Model-specific parameter handling
     if (actualModelId.startsWith('fal-ai/flux')) {
-      // Start with only the required parameters for Flux models
+      // FLUX models: start with required parameters
       finalInput.prompt = baseInput.prompt;
 
-      // Handle image size - some models use image_size, others use width/height
-      if (actualModelId === 'fal-ai/flux-schnell') {
-        // Schnell uses image_size parameter
-        if (baseInput.aspect_ratio || (baseInput.width && baseInput.height)) {
-          const aspectRatioMap: { [key: string]: string } = {
-            '1:1': 'square_hd',
-            '16:9': 'landscape_16_9',
-            '9:16': 'portrait_9_16',
-            '4:3': 'landscape_4_3',
-            '3:4': 'portrait_4_3'
-          };
+      // Default to width/height for current FLUX endpoints
+      finalInput.width = normalizedInputs.width || 1024;
+      finalInput.height = normalizedInputs.height || 1024;
 
-          if (baseInput.aspect_ratio) {
-            finalInput.image_size = aspectRatioMap[baseInput.aspect_ratio] || 'square_hd';
-          } else if (baseInput.width && baseInput.height) {
-            // Determine aspect ratio from dimensions
-            const ratio = baseInput.width / baseInput.height;
-            if (Math.abs(ratio - 1) < 0.1) {
-              finalInput.image_size = 'square_hd';
-            } else if (ratio > 1.5) {
-              finalInput.image_size = 'landscape_16_9';
-            } else if (ratio < 0.7) {
-              finalInput.image_size = 'portrait_9_16';
-            } else {
-              finalInput.image_size = 'square_hd';
-            }
-          } else {
-            finalInput.image_size = 'square_hd';
-          }
-        } else {
-          finalInput.image_size = 'square_hd';
-        }
-
-        // Schnell-specific optimized parameters
-        finalInput.num_inference_steps = normalizedInputs.num_inference_steps || 4;
-        finalInput.guidance_scale = normalizedInputs.guidance_scale || 3.5;
-      } else {
-        // Other flux models use width/height
-        finalInput.width = normalizedInputs.width || 1024;
-        finalInput.height = normalizedInputs.height || 1024;
-
-        // Standard parameters
-        if (normalizedInputs.guidance_scale) finalInput.guidance_scale = normalizedInputs.guidance_scale;
-        if (normalizedInputs.num_inference_steps) finalInput.num_inference_steps = normalizedInputs.num_inference_steps;
-      }
-
-      // Optional parameters only if provided by user (not from defaults)
+      // Standard optional parameters
+      if (normalizedInputs.guidance_scale) finalInput.guidance_scale = normalizedInputs.guidance_scale;
+      if (normalizedInputs.num_inference_steps) finalInput.num_inference_steps = normalizedInputs.num_inference_steps;
       if (normalizedInputs.num_images) finalInput.num_images = normalizedInputs.num_images;
       if (normalizedInputs.seed) finalInput.seed = normalizedInputs.seed;
+      // Forward image input if provided (enables img2img variants)
+      if (normalizedInputs.image_url) finalInput.image_url = normalizedInputs.image_url;
+
+      // Note: Some FLUX endpoints may require image_url (e.g., Kontext).
+      // We forward image_url when provided and rely on FAL to validate.
     } else {
       // For other models, use the base input but clean up any conflicting parameters
       finalInput = { ...baseInput };

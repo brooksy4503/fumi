@@ -53,6 +53,17 @@ function buildImageGenerationSections(model: ImageGenerationModel): any[] {
         });
     }
 
+    if (model.supportedInputs.imagePrompt) {
+        basicFields.push({
+            id: 'imageUrl',
+            label: 'Image URL',
+            type: 'text',
+            description: 'Public URL of a reference image (required for some models)',
+            placeholder: 'https://example.com/your-image.jpg',
+            validation: { pattern: '^https?://' }
+        });
+    }
+
     if (model.supportedInputs.negativePrompt) {
         basicFields.push({
             id: 'negativePrompt',

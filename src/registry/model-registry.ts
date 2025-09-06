@@ -23,12 +23,13 @@ const staticRegistry: Record<string, ModelMetadata> = {
     // IMAGE GENERATION MODELS
     // ============================================================================
 
-    'fal-ai/flux-pro': {
-        id: 'fal-ai/flux-pro',
-        name: 'FLUX.1 [pro]',
-        description: 'High-quality image generation model with professional-grade output and enhanced prompt following',
+    // New FLUX models
+    'fal-ai/flux-pro/kontext': {
+        id: 'fal-ai/flux-pro/kontext',
+        name: 'FLUX.1 Pro Kontext',
+        description: 'Context-aware FLUX Pro variant for enhanced prompt following and detail',
         category: 'image-generation',
-        version: '1.0',
+        version: '1.1',
         provider: 'Black Forest Labs',
         capabilities: ['text-to-image'],
         limits: {
@@ -44,11 +45,11 @@ const staticRegistry: Record<string, ModelMetadata> = {
         status: 'active',
         supportedInputs: {
             textPrompt: true,
-            imagePrompt: false,
+            imagePrompt: true,
             negativePrompt: false,
             dimensions: true,
             aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
-            styles: ['realistic', 'high-res', 'realism'],
+            styles: ['realistic', 'high-res', 'photorealistic'],
             controlNet: false,
         },
         supportedOutputs: {
@@ -58,45 +59,45 @@ const staticRegistry: Record<string, ModelMetadata> = {
         },
     } as ImageGenerationModel,
 
-    'fal-ai/flux-schnell': {
-        id: 'fal-ai/flux-schnell',
-        name: 'FLUX.1 [schnell]',
-        description: 'Fast and efficient image generation model with high quality outputs, optimized for speed',
+    'fal-ai/flux-pro/v1.1-ultra': {
+        id: 'fal-ai/flux-pro/v1.1-ultra',
+        name: 'FLUX.1 Pro v1.1 Ultra',
+        description: 'Highest quality FLUX Pro 1.1 Ultra for photorealistic, detailed images',
         category: 'image-generation',
-        version: '1.0',
+        version: '1.1',
         provider: 'Black Forest Labs',
         capabilities: ['text-to-image'],
         limits: {
-            maxInputSize: '1024x1024',
-            maxOutputSize: '1024x1024',
+            maxInputSize: '2048x2048',
+            maxOutputSize: '2048x2048',
             rateLimit: {
-                requestsPerMinute: 50,
-                requestsPerHour: 500,
+                requestsPerMinute: 20,
+                requestsPerHour: 200,
             },
-            costPerRequest: 0.01,
+            costPerRequest: 0.06,
         },
         requiresAuth: true,
         status: 'active',
         supportedInputs: {
             textPrompt: true,
-            imagePrompt: false,
+            imagePrompt: true,
             negativePrompt: false,
             dimensions: true,
             aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
-            styles: ['realistic', 'artistic'],
+            styles: ['realistic', 'photorealistic', 'ultra'],
             controlNet: false,
         },
         supportedOutputs: {
             formats: ['png', 'jpg', 'webp'],
-            maxResolution: '1024x1024',
+            maxResolution: '2048x2048',
             batchSize: 1,
         },
     } as ImageGenerationModel,
 
-    'fal-ai/flux-dev': {
-        id: 'fal-ai/flux-dev',
-        name: 'FLUX.1 [dev]',
-        description: 'Development version of FLUX.1 with balanced performance and quality for general use',
+    'fal-ai/flux/dev': {
+        id: 'fal-ai/flux/dev',
+        name: 'FLUX.1 dev',
+        description: 'Developer-friendly FLUX variant optimized for speed and iteration',
         category: 'image-generation',
         version: '1.0',
         provider: 'Black Forest Labs',
@@ -114,7 +115,7 @@ const staticRegistry: Record<string, ModelMetadata> = {
         status: 'active',
         supportedInputs: {
             textPrompt: true,
-            imagePrompt: false,
+            imagePrompt: true,
             negativePrompt: false,
             dimensions: true,
             aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],

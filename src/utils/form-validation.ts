@@ -70,6 +70,7 @@ export function formDataToModelInput(
             if (formData.format) input.format = formData.format;
             if (formData.guidanceScale) input.guidance_scale = Number(formData.guidanceScale);
             if (formData.numInferenceSteps) input.num_inference_steps = Number(formData.numInferenceSteps);
+            if (formData.imageUrl) input.image_url = formData.imageUrl;
             break;
 
         case 'video-generation':
