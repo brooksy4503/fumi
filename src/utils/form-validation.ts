@@ -73,26 +73,59 @@ export function formDataToModelInput(
             if (formData.imageUrl) input.image_url = formData.imageUrl;
             break;
 
-        case 'video-generation':
-            if (formData.prompt) input.prompt = formData.prompt;
-            if (formData.negativePrompt) input.negative_prompt = formData.negativePrompt;
-            if (formData.duration) input.duration = Number(formData.duration);
-            if (formData.width) input.width = Number(formData.width);
-            if (formData.height) input.height = Number(formData.height);
-            if (formData.aspectRatio) input.aspect_ratio = formData.aspectRatio;
-            if (formData.fps) input.fps = Number(formData.fps);
-            if (formData.seed !== undefined && formData.seed !== '') input.seed = Number(formData.seed);
-            if (formData.loop !== undefined) input.loop = formData.loop;
-            if (formData.imageUrl) input.image_url = formData.imageUrl;
-            break;
+        case 'video-generation': {
+            const videoModel = model as any;
 
-        case 'text-to-speech':
-            if (formData.text) input.text = formData.text;
-            if (formData.voice) input.voice = formData.voice;
+            // Check if this model has a custom input schema (like Veo 3 Fast)
+            if (videoModel.customInputSchema) {
+                // For custom schemas, use the field names directly from the form data
+                Object.entries(formData).forEach(([key, value]) => {
+                    if (value !== undefined && value !== null && value !== '') {
+                        input[key] = value;
+                    }
+                });
+            } else {
+                // Standard video generation mapping
+                if (formData.prompt) input.prompt = formData.prompt;
+                if (formData.negativePrompt) input.negative_prompt = formData.negativePrompt;
+                if (formData.duration) input.duration = Number(formData.duration);
+                if (formData.width) input.width = Number(formData.width);
+                if (formData.height) input.height = Number(formData.height);
+                if (formData.aspectRatio) input.aspect_ratio = formData.aspectRatio;
+                if (formData.fps) input.fps = Number(formData.fps);
+                if (formData.seed !== undefined && formData.seed !== '') input.seed = Number(formData.seed);
+                if (formData.loop !== undefined) input.loop = formData.loop;
+                if (formData.imageUrl) input.image_url = formData.imageUrl;
+            }
+            break;
+        }
+
+        case 'text-to-speech': {
+            const ttsModel = model as any;
+            if (ttsModel.requiresScript) {
+                if (formData.script) input.script = formData.script;
+
+                // Convert individual speaker voice fields to speakers array
+                const speakers = [];
+                for (let i = 0; i < (ttsModel.maxSpeakers || 4); i++) {
+                    const speakerVoice = formData[`speaker_${i}_voice`];
+                    if (speakerVoice) {
+                        speakers.push({ preset: speakerVoice });
+                    }
+                }
+                if (speakers.length > 0) {
+                    input.speakers = speakers;
+                }
+            } else {
+                if (formData.text) input.text = formData.text;
+                if (formData.voice) input.voice = formData.voice;
+            }
             if (formData.speed) input.speed = Number(formData.speed);
             if (formData.language) input.language = formData.language;
             if (formData.emotion) input.emotion = formData.emotion;
+            if (formData.audio_url) input.audio_url = formData.audio_url;
             break;
+        }
 
         case 'speech-to-text':
             if (formData.audio) input.audio = formData.audio;
@@ -199,11 +232,22 @@ export async function getFormDefaults(model: ModelMetadata): Promise<FormData> {
     // Convert model defaults to form format
     const formDefaults: FormData = {};
 
-    Object.entries(defaults).forEach(([key, value]) => {
-        // Convert snake_case to camelCase for form fields
-        const formKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-        formDefaults[formKey] = value;
-    });
+    // Check if this model has a custom input schema (like Veo 3 Fast)
+    const videoModel = model as any;
+    if (model.category === 'video-generation' && videoModel.customInputSchema) {
+        // For custom schemas, use the field names directly from the schema
+        Object.entries(videoModel.customInputSchema).forEach(([fieldId, fieldSchema]: [string, any]) => {
+            if (fieldSchema.default !== undefined) {
+                formDefaults[fieldId] = fieldSchema.default;
+            }
+        });
+    } else {
+        // Standard conversion: snake_case to camelCase for form fields
+        Object.entries(defaults).forEach(([key, value]) => {
+            const formKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+            formDefaults[formKey] = value;
+        });
+    }
 
     return formDefaults;
 }

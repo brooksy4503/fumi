@@ -276,7 +276,7 @@ export interface VideoGenerationModel extends BaseModelMetadata {
         videoPrompt: boolean;
         imagePrompt: boolean;
         negativePrompt: boolean;
-        durations: number[];
+        durations: (number | string)[];
         dimensions: boolean;
         aspectRatios: string[];
         fps: number[];
@@ -288,6 +288,14 @@ export interface VideoGenerationModel extends BaseModelMetadata {
         maxDuration: number;
         batchSize: number;
     };
+    /** Custom input schema for models with specific parameter requirements */
+    customInputSchema?: Record<string, {
+        type: 'string' | 'number' | 'boolean';
+        required: boolean;
+        default?: any;
+        enum?: any[];
+        description: string;
+    }>;
 }
 
 // ============================================================================
@@ -382,6 +390,14 @@ export interface TextToSpeechModel extends BaseModelMetadata {
         customVoices: boolean;
         voiceCloning: boolean;
     };
+    /** Whether the model requires an audio URL for voice cloning */
+    requiresAudioUrl?: boolean;
+    /** Minimum audio duration in seconds for conditioning audio */
+    minAudioDuration?: number;
+    /** Whether the model requires a script format instead of plain text */
+    requiresScript?: boolean;
+    /** Maximum number of speakers supported */
+    maxSpeakers?: number;
 }
 
 // ============================================================================

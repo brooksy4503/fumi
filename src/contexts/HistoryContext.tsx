@@ -172,7 +172,7 @@ export function useHistory() {
 
 // Hook for filtered history with search and filters
 export function useFilteredHistory(filter: HistoryFilter) {
-  const { history, searchHistory, filterByModel, filterByCategory } = useHistory();
+  const { history } = useHistory();
   const [filteredHistory, setFilteredHistory] = useState<HistoryItem[]>(history);
 
   useEffect(() => {
@@ -180,16 +180,21 @@ export function useFilteredHistory(filter: HistoryFilter) {
 
     // Apply search filter
     if (filter.search.trim()) {
-      result = searchHistory(filter.search);
+      const searchQuery = filter.search.toLowerCase();
+      result = result.filter(item => 
+        item.prompt?.toLowerCase().includes(searchQuery) ||
+        item.modelId?.toLowerCase().includes(searchQuery) ||
+        item.category?.toLowerCase().includes(searchQuery)
+      );
     }
 
     // Apply model filter
-    if (filter.modelId) {
+    if (filter.modelId && filter.modelId !== 'all') {
       result = result.filter(item => item.modelId === filter.modelId);
     }
 
     // Apply category filter
-    if (filter.category) {
+    if (filter.category && filter.category !== 'all') {
       result = result.filter(item => item.category === filter.category);
     }
 
@@ -204,7 +209,7 @@ export function useFilteredHistory(filter: HistoryFilter) {
     }
 
     setFilteredHistory(result);
-  }, [history, filter, searchHistory, filterByModel, filterByCategory]);
+  }, [history, filter]);
 
   return filteredHistory;
 }

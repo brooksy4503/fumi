@@ -200,6 +200,11 @@ function buildImageGenerationSections(model: ImageGenerationModel): any[] {
 function buildVideoGenerationSections(model: VideoGenerationModel): any[] {
     const sections = [];
 
+    // Check if this model has a custom input schema (like Veo 3 Fast)
+    if (model.customInputSchema) {
+        return buildCustomVideoGenerationSections(model);
+    }
+
     // Basic settings
     const basicFields: FieldConfig[] = [];
 
@@ -326,12 +331,107 @@ function buildVideoGenerationSections(model: VideoGenerationModel): any[] {
     return sections;
 }
 
+function buildCustomVideoGenerationSections(model: VideoGenerationModel): any[] {
+    const sections = [];
+    const basicFields: FieldConfig[] = [];
+
+    // Build fields based on custom input schema
+    if (model.customInputSchema) {
+        Object.entries(model.customInputSchema).forEach(([fieldId, fieldSchema]) => {
+            const field: FieldConfig = {
+                id: fieldId,
+                label: fieldSchema.description.split('.')[0] || fieldId,
+                type: fieldSchema.type === 'string' ? 'text' : fieldSchema.type,
+                description: fieldSchema.description,
+                required: fieldSchema.required,
+                defaultValue: fieldSchema.default
+            };
+
+            // Handle specific field types
+            if (fieldSchema.type === 'string' && fieldSchema.enum) {
+                (field as any).type = 'select';
+                (field as any).options = fieldSchema.enum.map(value => ({
+                    value: value,
+                    label: value
+                }));
+            }
+
+            // Special handling for specific fields
+            if (fieldId === 'prompt') {
+                field.type = 'textarea';
+                field.placeholder = 'A woman looks into the camera, breathes in, then exclaims energetically...';
+            } else if (fieldId === 'image_url') {
+                field.placeholder = 'https://example.com/your-image.jpg';
+                field.validation = {
+                    pattern: '^https?://'
+                };
+            } else if (fieldId === 'generate_audio') {
+                field.type = 'boolean';
+            }
+
+            basicFields.push(field);
+        });
+    }
+
+    if (basicFields.length > 0) {
+        sections.push({
+            id: 'basic',
+            title: 'Basic Settings',
+            fields: basicFields
+        });
+    }
+
+    return sections;
+}
+
 function buildTextToSpeechSections(model: TextToSpeechModel): any[] {
     const sections = [];
 
     // Basic settings
-    const basicFields: FieldConfig[] = [
-        {
+    const basicFields: FieldConfig[] = [];
+
+    // Add appropriate text input based on model requirements
+    if (model.requiresScript) {
+        basicFields.push({
+            id: 'script',
+            label: 'Script',
+            type: 'textarea',
+            description: 'Enter the script with speaker labels. Each "Speaker X:" will use the voice you select for that speaker below.',
+            required: true,
+            placeholder: 'Speaker 0: Hello world!\nSpeaker 1: How are you?\n\nNote: Select voices for each speaker below.',
+            validation: {
+                maxLength: model.maxTextLength,
+                custom: (value: string) => {
+                    if (!value) return 'Script is required';
+                    // Check if script contains speaker labels
+                    if (!value.match(/Speaker\s+\d+:/i)) {
+                        return 'Script must include speaker labels (e.g., "Speaker 0: text")';
+                    }
+                    return null;
+                }
+            }
+        });
+
+        // Add individual speaker voice selection
+        if (model.maxSpeakers && model.maxSpeakers > 1) {
+            // Add up to 4 individual speaker voice selection fields
+            for (let i = 0; i < model.maxSpeakers; i++) {
+                basicFields.push({
+                    id: `speaker_${i}_voice`,
+                    label: `Speaker ${i} Voice`,
+                    type: 'select',
+                    description: `Select voice preset for Speaker ${i} in your script`,
+                    required: false, // Not all speakers may be used
+                    options: model.voices.map(voice => ({
+                        value: voice.name,
+                        label: voice.name
+                    })),
+                    placeholder: `Choose voice for Speaker ${i}`
+                });
+            }
+        }
+    } else {
+        basicFields.push({
             id: 'text',
             label: 'Text to Speak',
             type: 'textarea',
@@ -340,8 +440,30 @@ function buildTextToSpeechSections(model: TextToSpeechModel): any[] {
             validation: {
                 maxLength: model.maxTextLength
             }
-        }
-    ];
+        });
+    }
+
+    // Add audio URL field for voice cloning models
+    if (model.requiresAudioUrl) {
+        basicFields.push({
+            id: 'audio_url',
+            label: 'Conditioning Audio URL',
+            type: 'text',
+            description: `URL to the conditioning audio file (minimum ${model.minAudioDuration || 30} seconds)`,
+            required: true,
+            placeholder: 'https://example.com/audio.mp3',
+            validation: {
+                pattern: '^https?://.*\\.(mp3|wav|flac|ogg|m4a)$',
+                custom: (value: string) => {
+                    if (!value) return 'Audio URL is required';
+                    if (!value.match(/^https?:\/\/.*\.(mp3|wav|flac|ogg|m4a)$/i)) {
+                        return 'Please provide a valid audio file URL';
+                    }
+                    return null;
+                }
+            }
+        });
+    }
 
     if (model.voices.length > 0) {
         basicFields.push({

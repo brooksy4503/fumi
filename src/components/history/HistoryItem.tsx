@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { HistoryItem as HistoryItemType } from '@/types/history';
 import { useHistory } from '@/contexts/HistoryContext';
@@ -15,9 +15,11 @@ import {
   Cpu, 
   Calendar,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Play
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { generateVideoThumbnail, getVideoPlaceholderUrl } from '@/utils/video-thumbnail';
 
 interface HistoryItemProps {
   item: HistoryItemType;
@@ -32,6 +34,64 @@ export default function HistoryItem({ item, onImageClick, onLoadItem, onSelectIt
   const { removeFromHistory } = useHistory();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [videoThumbnails, setVideoThumbnails] = useState<Record<string, string>>({});
+
+  // Generate video thumbnails when component mounts or videos change
+  useEffect(() => {
+    const generateThumbnails = async () => {
+      // Debug logging for video data
+      console.log('HistoryItem video data:', {
+        hasVideos: !!(item.result.videos && item.result.videos.length > 0),
+        videosArray: item.result.videos,
+        result: item.result,
+        modelCategory: item.category
+      });
+      
+      if (item.result.videos && item.result.videos.length > 0) {
+        const newThumbnails: Record<string, string> = {};
+        
+        for (const video of item.result.videos) {
+          if (!videoThumbnails[video.url]) {
+            try {
+              const thumbnail = await generateVideoThumbnail(video.url);
+              if (thumbnail) {
+                newThumbnails[video.url] = thumbnail;
+              } else {
+                // Use placeholder if thumbnail generation fails
+                newThumbnails[video.url] = getVideoPlaceholderUrl();
+              }
+            } catch (error) {
+              console.error('Failed to generate thumbnail for video:', video.url, error);
+              // Use placeholder on error
+              newThumbnails[video.url] = getVideoPlaceholderUrl();
+            }
+          }
+        }
+        
+        if (Object.keys(newThumbnails).length > 0) {
+          setVideoThumbnails(prev => ({ ...prev, ...newThumbnails }));
+        }
+      } else if (item.result.video && item.result.video.url) {
+        // Fallback: handle single video object
+        const video = item.result.video;
+        if (!videoThumbnails[video.url]) {
+          try {
+            const thumbnail = await generateVideoThumbnail(video.url);
+            if (thumbnail) {
+              setVideoThumbnails(prev => ({ ...prev, [video.url]: thumbnail }));
+            } else {
+              setVideoThumbnails(prev => ({ ...prev, [video.url]: getVideoPlaceholderUrl() }));
+            }
+          } catch (error) {
+            console.error('Failed to generate thumbnail for video:', video.url, error);
+            setVideoThumbnails(prev => ({ ...prev, [video.url]: getVideoPlaceholderUrl() }));
+          }
+        }
+      }
+    };
+    
+    generateThumbnails();
+  }, [item.result.videos, item.result.video, videoThumbnails]);
 
   const handleDelete = async () => {
     if (isDeleting) return;
@@ -65,10 +125,28 @@ export default function HistoryItem({ item, onImageClick, onLoadItem, onSelectIt
 
   const getThumbnail = () => {
     if (item.result.images && item.result.images.length > 0) {
-      return item.result.images[0];
+      return { ...item.result.images[0], type: 'image' };
     }
     if (item.result.videos && item.result.videos.length > 0) {
-      return item.result.videos[0];
+      const video = item.result.videos[0];
+      const thumbnailUrl = videoThumbnails[video.url] || getVideoPlaceholderUrl();
+      return { 
+        ...video, 
+        url: thumbnailUrl, // Use thumbnail for display
+        originalUrl: video.url, // Keep original video URL
+        type: 'video' 
+      };
+    }
+    // Fallback: check for single video object (in case normalization didn't work)
+    if (item.result.video && item.result.video.url) {
+      const video = item.result.video;
+      const thumbnailUrl = videoThumbnails[video.url] || getVideoPlaceholderUrl();
+      return { 
+        ...video, 
+        url: thumbnailUrl, // Use thumbnail for display
+        originalUrl: video.url, // Keep original video URL
+        type: 'video' 
+      };
     }
     return null;
   };
@@ -76,6 +154,7 @@ export default function HistoryItem({ item, onImageClick, onLoadItem, onSelectIt
   const getMediaType = () => {
     if (item.result.images && item.result.images.length > 0) return 'image';
     if (item.result.videos && item.result.videos.length > 0) return 'video';
+    if (item.result.video && item.result.video.url) return 'video'; // Fallback for single video
     if (item.result.audio) return 'audio';
     if (item.result.text) return 'text';
     return 'unknown';
@@ -84,7 +163,8 @@ export default function HistoryItem({ item, onImageClick, onLoadItem, onSelectIt
   const getMediaCount = () => {
     const imageCount = item.result.images?.length || 0;
     const videoCount = item.result.videos?.length || 0;
-    return imageCount + videoCount;
+    const singleVideoCount = (item.result.video && item.result.video.url) ? 1 : 0;
+    return imageCount + videoCount + singleVideoCount;
   };
 
   const thumbnail = getThumbnail();
@@ -127,6 +207,11 @@ export default function HistoryItem({ item, onImageClick, onLoadItem, onSelectIt
                   className="object-cover"
                   sizes="48px"
                 />
+                {thumbnail.type === 'video' && (
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                    <Play className="w-4 h-4 text-white" fill="currentColor" />
+                  </div>
+                )}
               </div>
             )}
             <div className="flex-1 min-w-0">
@@ -203,9 +288,16 @@ export default function HistoryItem({ item, onImageClick, onLoadItem, onSelectIt
                   className="object-cover hover:scale-105 transition-transform"
                   sizes="(max-width: 768px) 100vw, 300px"
                 />
+                {thumbnail.type === 'video' && (
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                    <div className="bg-black/50 rounded-full p-3">
+                      <Play className="w-8 h-8 text-white" fill="currentColor" />
+                    </div>
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
                   <div className="opacity-0 hover:opacity-100 transition-opacity bg-white/90 text-black px-2 py-1 rounded text-xs font-medium">
-                    Click to expand
+                    {thumbnail.type === 'video' ? 'Click to play video' : 'Click to expand'}
                   </div>
                 </div>
               </div>
@@ -252,7 +344,10 @@ export default function HistoryItem({ item, onImageClick, onLoadItem, onSelectIt
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleDownload(thumbnail.url, `generated-${item.id}.${mediaType === 'image' ? 'jpg' : 'mp4'}`)}
+                onClick={() => {
+                  const downloadUrl = (thumbnail as any).originalUrl || thumbnail.url;
+                  handleDownload(downloadUrl, `generated-${item.id}.${mediaType === 'image' ? 'jpg' : 'mp4'}`);
+                }}
                 className="flex-1"
               >
                 <Download className="w-3 h-3 mr-1" />
@@ -273,7 +368,11 @@ export default function HistoryItem({ item, onImageClick, onLoadItem, onSelectIt
           {isExpanded && (
             <div className="space-y-3 pt-3 border-t">
               <div>
-                <h4 className="text-sm font-medium mb-2">Full Prompt</h4>
+                <h4 className="text-sm font-medium mb-2">
+                  {item.category === 'text-to-speech' ? 'Script/Text' : 
+                   item.category === 'audio-generation' ? 'Description' : 
+                   'Full Prompt'}
+                </h4>
                 <p className="text-sm text-muted-foreground bg-muted p-2 rounded">
                   {item.prompt}
                 </p>

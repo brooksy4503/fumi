@@ -110,7 +110,7 @@ export async function POST(request: Request) {
             normalizedModelId = normalizedModelId.replace(/\/api$/, '');
           }
         }
-      } catch {}
+      } catch { }
     }
 
     // Handle common model ID aliases/mismatches
@@ -130,7 +130,8 @@ export async function POST(request: Request) {
       'fast-sdxl': 'fal-ai/fast-sdxl',
       'stable-video': 'fal-ai/stable-video',
       'stable-video-diffusion': 'fal-ai/stable-video-diffusion',
-      'metavoice': 'fal-ai/metavoice-v1',
+      'vibevoice': 'fal-ai/vibevoice',
+      'xtts': 'fal-ai/xtts',
     };
 
     // Map alias to actual model ID if needed
@@ -219,8 +220,11 @@ export async function POST(request: Request) {
       return normalized;
     };
 
-    const normalizedDefaults = normalizeParams(defaultParams);
-    const normalizedInputs = normalizeParams(inputParams);
+    // Special handling for Veo 3 Fast - it already uses correct field names
+    const isVeo3Fast = actualModelId === 'fal-ai/veo3/fast/image-to-video';
+
+    const normalizedDefaults = isVeo3Fast ? defaultParams : normalizeParams(defaultParams);
+    const normalizedInputs = isVeo3Fast ? inputParams : normalizeParams(inputParams);
 
     let baseInput = {
       ...normalizedDefaults,
@@ -236,7 +240,15 @@ export async function POST(request: Request) {
     let finalInput: any = {};
 
     // Model-specific parameter handling
-    if (actualModelId.startsWith('fal-ai/flux')) {
+    if (actualModelId === 'fal-ai/veo3/fast/image-to-video') {
+      // Veo 3 Fast: use the input parameters directly as they're already in the correct format
+      finalInput = { ...baseInput };
+
+      // Ensure required fields have default values if not provided
+      if (!finalInput.duration) finalInput.duration = '8s';
+      if (finalInput.generate_audio === undefined) finalInput.generate_audio = true;
+      if (!finalInput.resolution) finalInput.resolution = '720p';
+    } else if (actualModelId.startsWith('fal-ai/flux')) {
       // FLUX models: start with required parameters
       finalInput.prompt = baseInput.prompt;
 

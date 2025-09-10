@@ -45,18 +45,18 @@ export default function HistorySidebar({
 }: HistorySidebarProps) {
   const { history, clearHistory, exportHistory, importHistory } = useHistory();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedModel, setSelectedModel] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedModel, setSelectedModel] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  const filter: HistoryFilter = {
+  const filter: HistoryFilter = useMemo(() => ({
     search: searchQuery,
     modelId: selectedModel,
     category: selectedCategory,
     dateRange: { start: null, end: null }
-  };
+  }), [searchQuery, selectedModel, selectedCategory]);
 
   const filteredHistory = useFilteredHistory(filter);
 
@@ -108,8 +108,8 @@ export default function HistorySidebar({
         if (success) {
           // Reset filters to show imported data
           setSearchQuery('');
-          setSelectedModel('');
-          setSelectedCategory('');
+          setSelectedModel('all');
+          setSelectedCategory('all');
         }
       } catch (error) {
         console.error('Import failed:', error);
@@ -135,11 +135,11 @@ export default function HistorySidebar({
 
   const clearFilters = () => {
     setSearchQuery('');
-    setSelectedModel('');
-    setSelectedCategory('');
+    setSelectedModel('all');
+    setSelectedCategory('all');
   };
 
-  const hasActiveFilters = searchQuery || selectedModel || selectedCategory;
+  const hasActiveFilters = searchQuery || (selectedModel && selectedModel !== 'all') || (selectedCategory && selectedCategory !== 'all');
 
   return (
     <>
@@ -153,14 +153,14 @@ export default function HistorySidebar({
 
       {/* Sidebar */}
       <div className={`
-        fixed top-0 right-0 h-full w-80 max-w-[50vw] sm:max-w-[60vw] bg-background border-l z-50 transform transition-transform duration-300 ease-in-out
-        ${isOpen ? 'translate-x-0' : 'translate-x-full'}
-        lg:relative lg:translate-x-0 lg:z-auto lg:w-80 lg:max-w-none lg:flex-shrink-0
+        fixed top-0 left-0 h-screen w-80 max-w-[50vw] sm:max-w-[60vw] bg-background border-r z-50 transform transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:relative lg:translate-x-0 lg:z-auto lg:w-80 lg:max-w-none lg:flex-shrink-0 lg:h-[calc(100vh-140px)] lg:max-h-[calc(100vh-140px)] lg:block
         ${className}
       `}>
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="p-4 border-b">
+          <div className="p-4 border-b flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <HistoryIcon className="w-5 h-5" />
@@ -213,7 +213,7 @@ export default function HistorySidebar({
                 Filters
                 {hasActiveFilters && (
                   <Badge variant="destructive" className="ml-1 text-xs">
-                    {[searchQuery, selectedModel, selectedCategory].filter(Boolean).length}
+                    {[searchQuery, selectedModel !== 'all' ? selectedModel : '', selectedCategory !== 'all' ? selectedCategory : ''].filter(Boolean).length}
                   </Badge>
                 )}
               </Button>
@@ -231,7 +231,7 @@ export default function HistorySidebar({
 
           {/* Filters */}
           {showFilters && (
-            <div className="p-4 border-b bg-muted/30">
+            <div className="p-4 border-b bg-muted/30 flex-shrink-0">
               <div className="space-y-3">
                 <div>
                   <label className="text-sm font-medium mb-1 block">Model</label>
@@ -240,7 +240,7 @@ export default function HistorySidebar({
                       <SelectValue placeholder="All models" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All models</SelectItem>
+                      <SelectItem value="all">All models</SelectItem>
                       {models.map(modelId => (
                         <SelectItem key={modelId} value={modelId}>
                           {modelId.split('/').pop()}
@@ -256,7 +256,7 @@ export default function HistorySidebar({
                       <SelectValue placeholder="All categories" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All categories</SelectItem>
+                      <SelectItem value="all">All categories</SelectItem>
                       {categories.map(category => (
                         <SelectItem key={category} value={category}>
                           {category.replace('-', ' ')}
@@ -301,7 +301,7 @@ export default function HistorySidebar({
           </div>
 
           {/* Footer Actions */}
-          <div className="p-4 border-t bg-muted/30">
+          <div className="p-4 border-t bg-muted/30 flex-shrink-0">
             <div className="space-y-2">
               <div className="flex gap-2">
                 <Button

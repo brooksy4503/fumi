@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import Image from 'next/image';
 import { ModelMetadata } from '@/types/fal-models';
 import { FormData } from '@/types/form-fields';
@@ -23,12 +23,18 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import ShadcnDynamicForm from './ShadcnDynamicForm';
 import ImageModal from './ImageModal';
+import MediaModal from './MediaModal';
 
 interface UnifiedFalInterfaceProps {
   className?: string;
   onImageClick?: (image: any) => void;
   loadHistoryItem?: any;
   onHistoryItemLoaded?: () => void;
+  onReset?: () => void;
+}
+
+export interface UnifiedFalInterfaceRef {
+  resetForm: () => void;
 }
 
 interface GenerationResult {
@@ -43,7 +49,7 @@ interface GenerationResult {
   };
 }
 
-export default function UnifiedFalInterface({ className = "", onImageClick, loadHistoryItem, onHistoryItemLoaded }: UnifiedFalInterfaceProps) {
+const UnifiedFalInterface = forwardRef<UnifiedFalInterfaceRef, UnifiedFalInterfaceProps>(({ className = "", onImageClick, loadHistoryItem, onHistoryItemLoaded }, ref) => {
   const { addToHistory } = useHistory();
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -60,6 +66,29 @@ export default function UnifiedFalInterface({ className = "", onImageClick, load
     alt: string;
     metadata?: any;
   } | null>(null);
+  const [modalMedia, setModalMedia] = useState<{
+    url: string;
+    mediaType: 'image' | 'audio' | 'video';
+    alt: string;
+    metadata?: any;
+  } | null>(null);
+
+  // Reset form function
+  const resetForm = useCallback(() => {
+    setSelectedModelId('');
+    setSelectedModel(null);
+    setFormConfig(null);
+    setDefaultValues({});
+    setGenerationResult(null);
+    setError(null);
+    setErrorDetails(null);
+    setIsGenerating(false);
+  }, []);
+
+  // Expose resetForm function via ref
+  useImperativeHandle(ref, () => ({
+    resetForm
+  }), [resetForm]);
 
   // Load available models on mount
   React.useEffect(() => {
@@ -217,14 +246,28 @@ export default function UnifiedFalInterface({ className = "", onImageClick, load
 
       // Save to history
       try {
+        // Normalize the result data structure for consistent handling
+        const normalizedResult = normalizeApiResponse(data.data || data);
+        
+        // Debug logging for video generation
+        if (selectedModel.category === 'video-generation') {
+          console.log('Video generation result:', {
+            originalData: data,
+            normalizedResult: normalizedResult,
+            hasVideos: !!(normalizedResult.videos && normalizedResult.videos.length > 0),
+            hasVideo: !!normalizedResult.video,
+            videosArray: normalizedResult.videos
+          });
+        }
+        
         addToHistory({
           modelId: selectedModelId,
           modelName: selectedModel.name,
           category: selectedModel.category,
           provider: selectedModel.provider,
-          prompt: formData.prompt || 'No prompt provided',
+          prompt: extractPromptForHistory(formData, selectedModel),
           inputParams: formData,
-          result: data.data || data,
+          result: normalizedResult,
           metadata: {
             processingTime: data.metadata.processingTime,
             version: selectedModel.version,
@@ -270,6 +313,121 @@ export default function UnifiedFalInterface({ className = "", onImageClick, load
 
   const closeModal = () => {
     setModalImage(null);
+  };
+
+  const closeMediaModal = () => {
+    setModalMedia(null);
+  };
+
+  // Normalize API response to ensure consistent data structure
+  const normalizeApiResponse = (data: any) => {
+    if (!data) return data;
+    
+    const normalized = { ...data };
+    
+    // Handle video data normalization
+    if (data.video && !data.videos) {
+      // Convert single video object to videos array
+      normalized.videos = [data.video];
+      delete normalized.video;
+    } else if (data.data?.video && !data.data?.videos) {
+      // Handle nested video object
+      normalized.data = { ...data.data };
+      normalized.data.videos = [data.data.video];
+      delete normalized.data.video;
+    }
+    
+    // Handle image data normalization
+    if (data.image && !data.images) {
+      // Convert single image object to images array
+      normalized.images = [data.image];
+      delete normalized.image;
+    } else if (data.data?.image && !data.data?.images) {
+      // Handle nested image object
+      normalized.data = { ...data.data };
+      normalized.data.images = [data.data.image];
+      delete normalized.data.image;
+    }
+    
+    return normalized;
+  };
+
+  // Media detection functions
+  const detectMediaType = (data: any): 'image' | 'audio' | 'video' | null => {
+    // Check for audio
+    if (data.audio?.url || data.data?.audio?.url) {
+      return 'audio';
+    }
+    // Check for video
+    if (data.video?.url || data.data?.video?.url || data.videos?.length > 0 || data.data?.videos?.length > 0) {
+      return 'video';
+    }
+    // Check for images
+    if (data.images?.length > 0 || data.data?.images?.length > 0) {
+      return 'image';
+    }
+    return null;
+  };
+
+  const getMediaData = (data: any, mediaType: 'image' | 'audio' | 'video') => {
+    switch (mediaType) {
+      case 'audio':
+        return data.audio || data.data?.audio;
+      case 'video':
+        return data.video || data.data?.video || (data.videos && data.videos[0]) || (data.data?.videos && data.data.videos[0]);
+      case 'image':
+        return data.images?.[0] || data.data?.images?.[0];
+      default:
+        return null;
+    }
+  };
+
+  const handleMediaClick = (mediaData: any, mediaType: 'image' | 'audio' | 'video', index?: number) => {
+    const mediaInfo = {
+      url: mediaData.url,
+      mediaType,
+      alt: `Generated ${mediaType} ${index !== undefined ? index + 1 : ''}`,
+      metadata: {
+        width: mediaData.width,
+        height: mediaData.height,
+        fileSize: mediaData.file_size || mediaData.fileSize,
+        contentType: mediaData.content_type || mediaData.contentType,
+        duration: mediaData.duration,
+        sampleRate: mediaData.sample_rate || mediaData.sampleRate
+      }
+    };
+    
+    if (onImageClick) {
+      onImageClick(mediaInfo);
+    } else {
+      setModalMedia(mediaInfo);
+    }
+  };
+
+  // Extract the appropriate prompt-like field for history display
+  const extractPromptForHistory = (formData: FormData, model: ModelMetadata): string => {
+    // For text-to-speech models that require script
+    if (model.category === 'text-to-speech' && (model as any).requiresScript) {
+      return formData.script || 'No script provided';
+    }
+    
+    // For text-to-speech models that use text
+    if (model.category === 'text-to-speech') {
+      return formData.text || 'No text provided';
+    }
+    
+    // For audio generation models
+    if (model.category === 'audio-generation') {
+      return formData.prompt || 'No prompt provided';
+    }
+    
+    // For image and video generation models
+    if (model.category === 'image-generation' || model.category === 'video-generation') {
+      return formData.prompt || 'No prompt provided';
+    }
+    
+    // Fallback: try common field names
+    return formData.prompt || formData.text || formData.script || 'No input provided';
   };
 
   return (
@@ -378,19 +536,21 @@ export default function UnifiedFalInterface({ className = "", onImageClick, load
             </AlertDescription>
           </Alert>
 
-          {/* Display images if they exist in the response */}
-          {(generationResult.data?.images && generationResult.data.images.length > 0) || 
-           (generationResult.data?.data?.images && generationResult.data.data.images.length > 0) ? (
-            <div className="space-y-4">
-              <h4 className="font-medium">Generated Images</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Handle both response structures */}
-                {generationResult.data?.images && generationResult.data.images.length > 0 
-                  ? generationResult.data.images.map((image: any, index: number) => (
+          {/* Display media content based on detected type */}
+          {(() => {
+            const mediaType = detectMediaType(generationResult.data);
+            
+            if (mediaType === 'image') {
+              const images = generationResult.data?.images || generationResult.data?.data?.images || [];
+              return (
+                <div className="space-y-4">
+                  <h4 className="font-medium">Generated Images</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {images.map((image: any, index: number) => (
                       <div 
                         key={index} 
                         className="relative aspect-square w-full overflow-hidden rounded-lg shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200"
-                        onClick={() => handleImageClick(image, index)}
+                        onClick={() => handleMediaClick(image, 'image', index)}
                       >
                         <Image
                           src={image.url}
@@ -405,51 +565,126 @@ export default function UnifiedFalInterface({ className = "", onImageClick, load
                           </div>
                         </div>
                       </div>
-                    ))
-                  : generationResult.data?.data?.images.map((image: any, index: number) => (
-                      <div 
-                        key={index} 
-                        className="relative aspect-square w-full overflow-hidden rounded-lg shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200"
-                        onClick={() => handleImageClick(image, index)}
-                      >
-                        <Image
-                          src={image.url}
-                          alt={`Generated image ${index + 1}`}
-                          fill
-                          className="object-contain hover:scale-105 transition-transform duration-200"
-                          sizes="(max-width: 768px) 100vw, 50vw"
-                        />
-                        <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors duration-200 flex items-center justify-center">
-                          <div className="opacity-0 hover:opacity-100 transition-opacity duration-200 bg-white/90 text-black px-3 py-1 rounded-full text-sm font-medium">
-                            Click to expand
-                          </div>
-                        </div>
+                    ))}
+                  </div>
+                  {/* Display description if it exists */}
+                  {generationResult.data?.description && (
+                    <div className="p-4 rounded-lg border bg-card text-card-foreground">
+                      <h4 className="font-medium mb-2">Description</h4>
+                      <p className="text-muted-foreground">{generationResult.data.description}</p>
+                    </div>
+                  )}
+                  {generationResult.data?.data?.description && (
+                    <div className="p-4 rounded-lg border bg-card text-card-foreground">
+                      <h4 className="font-medium mb-2">Description</h4>
+                      <p className="text-muted-foreground">{generationResult.data.data.description}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            } else if (mediaType === 'audio') {
+              const audioData = getMediaData(generationResult.data, 'audio');
+              return (
+                <div className="space-y-4">
+                  <h4 className="font-medium">Generated Audio</h4>
+                  <div className="flex items-center justify-center p-8 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-lg border">
+                    <div className="text-center space-y-4 max-w-md">
+                      <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg mx-auto">
+                        <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                        </svg>
                       </div>
-                    ))
-                }
-              </div>
-              {/* Display description if it exists */}
-              {generationResult.data?.description && (
-                <div className="p-4 rounded-lg border bg-card text-card-foreground">
-                  <h4 className="font-medium mb-2">Description</h4>
-                  <p className="text-muted-foreground">{generationResult.data.description}</p>
+                      <div className="space-y-2">
+                        <h5 className="font-medium">Audio Generated Successfully</h5>
+                        <p className="text-sm text-muted-foreground">
+                          {audioData.duration && `Duration: ${Math.round(audioData.duration)}s`}
+                          {audioData.file_size && ` • Size: ${(audioData.file_size / 1024 / 1024).toFixed(1)} MB`}
+                        </p>
+                      </div>
+                      <Button 
+                        onClick={() => handleMediaClick(audioData, 'audio')}
+                        className="w-full"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        Play Audio
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Display description if it exists */}
+                  {generationResult.data?.description && (
+                    <div className="p-4 rounded-lg border bg-card text-card-foreground">
+                      <h4 className="font-medium mb-2">Description</h4>
+                      <p className="text-muted-foreground">{generationResult.data.description}</p>
+                    </div>
+                  )}
+                  {generationResult.data?.data?.description && (
+                    <div className="p-4 rounded-lg border bg-card text-card-foreground">
+                      <h4 className="font-medium mb-2">Description</h4>
+                      <p className="text-muted-foreground">{generationResult.data.data.description}</p>
+                    </div>
+                  )}
                 </div>
-              )}
-              {generationResult.data?.data?.description && (
-                <div className="p-4 rounded-lg border bg-card text-card-foreground">
-                  <h4 className="font-medium mb-2">Description</h4>
-                  <p className="text-muted-foreground">{generationResult.data.data.description}</p>
+              );
+            } else if (mediaType === 'video') {
+              const videoData = getMediaData(generationResult.data, 'video');
+              return (
+                <div className="space-y-4">
+                  <h4 className="font-medium">Generated Video</h4>
+                  <div className="flex items-center justify-center p-8 bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 rounded-lg border">
+                    <div className="text-center space-y-4 max-w-md">
+                      <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg mx-auto">
+                        <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                        </svg>
+                      </div>
+                      <div className="space-y-2">
+                        <h5 className="font-medium">Video Generated Successfully</h5>
+                        <p className="text-sm text-muted-foreground">
+                          {videoData.duration && `Duration: ${Math.round(videoData.duration)}s`}
+                          {videoData.file_size && ` • Size: ${(videoData.file_size / 1024 / 1024).toFixed(1)} MB`}
+                          {videoData.width && videoData.height && ` • ${videoData.width}×${videoData.height}`}
+                        </p>
+                      </div>
+                      <Button 
+                        onClick={() => handleMediaClick(videoData, 'video')}
+                        className="w-full"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        Play Video
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Display description if it exists */}
+                  {generationResult.data?.description && (
+                    <div className="p-4 rounded-lg border bg-card text-card-foreground">
+                      <h4 className="font-medium mb-2">Description</h4>
+                      <p className="text-muted-foreground">{generationResult.data.description}</p>
+                    </div>
+                  )}
+                  {generationResult.data?.data?.description && (
+                    <div className="p-4 rounded-lg border bg-card text-card-foreground">
+                      <h4 className="font-medium mb-2">Description</h4>
+                      <p className="text-muted-foreground">{generationResult.data.data.description}</p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="p-4 rounded-lg border bg-card text-card-foreground">
-              <h4 className="font-medium mb-2">Generated Content</h4>
-              <pre className="text-sm text-muted-foreground overflow-auto max-h-96">
-                {JSON.stringify(generationResult.data, null, 2)}
-              </pre>
-            </div>
-          )}
+              );
+            } else {
+              // Fallback to JSON display for other content types
+              return (
+                <div className="p-4 rounded-lg border bg-card text-card-foreground">
+                  <h4 className="font-medium mb-2">Generated Content</h4>
+                  <pre className="text-sm text-muted-foreground overflow-auto max-h-96">
+                    {JSON.stringify(generationResult.data, null, 2)}
+                  </pre>
+                </div>
+              );
+            }
+          })()}
         </div>
       )}
 
@@ -464,6 +699,23 @@ export default function UnifiedFalInterface({ className = "", onImageClick, load
           metadata={modalImage.metadata}
         />
       )}
+
+      {/* Media Modal */}
+      {modalMedia && (
+        <MediaModal
+          isOpen={!!modalMedia}
+          onClose={closeMediaModal}
+          mediaUrl={modalMedia.url}
+          mediaType={modalMedia.mediaType}
+          alt={modalMedia.alt}
+          title={`Generated ${modalMedia.mediaType.charAt(0).toUpperCase() + modalMedia.mediaType.slice(1)}`}
+          metadata={modalMedia.metadata}
+        />
+      )}
     </div>
   );
-}
+});
+
+UnifiedFalInterface.displayName = 'UnifiedFalInterface';
+
+export default UnifiedFalInterface;
