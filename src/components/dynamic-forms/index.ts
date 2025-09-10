@@ -1,5 +1,5 @@
 // Main components
-export { default as FalModelForm } from '../FalModelForm';
+export { default as FumiModelForm } from '../FumiModelForm';
 export { default as DynamicForm } from '../DynamicForm';
 
 // Form field components

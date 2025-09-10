@@ -25,7 +25,7 @@ import ShadcnDynamicForm from './ShadcnDynamicForm';
 import ImageModal from './ImageModal';
 import MediaModal from './MediaModal';
 
-interface UnifiedFalInterfaceProps {
+interface UnifiedFumiInterfaceProps {
   className?: string;
   onImageClick?: (image: any) => void;
   loadHistoryItem?: any;
@@ -33,7 +33,7 @@ interface UnifiedFalInterfaceProps {
   onReset?: () => void;
 }
 
-export interface UnifiedFalInterfaceRef {
+export interface UnifiedFumiInterfaceRef {
   resetForm: () => void;
 }
 
@@ -49,7 +49,7 @@ interface GenerationResult {
   };
 }
 
-const UnifiedFalInterface = forwardRef<UnifiedFalInterfaceRef, UnifiedFalInterfaceProps>(({ className = "", onImageClick, loadHistoryItem, onHistoryItemLoaded }, ref) => {
+const UnifiedFumiInterface = forwardRef<UnifiedFumiInterfaceRef, UnifiedFumiInterfaceProps>(({ className = "", onImageClick, loadHistoryItem, onHistoryItemLoaded }, ref) => {
   const { addToHistory } = useHistory();
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -433,7 +433,7 @@ const UnifiedFalInterface = forwardRef<UnifiedFalInterfaceRef, UnifiedFalInterfa
   return (
     <div className={`w-full max-w-4xl mx-auto p-4 ${className}`}>
       <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-4">Fal Model Interface</h2>
+        <h2 className="text-2xl font-bold mb-4">Fumi Model Interface</h2>
         <div className="space-y-2">
           <label htmlFor="model-select" className="block text-sm font-medium text-muted-foreground">
             Select Model
@@ -716,6 +716,6 @@ const UnifiedFalInterface = forwardRef<UnifiedFalInterfaceRef, UnifiedFalInterfa
   );
 });
 
-UnifiedFalInterface.displayName = 'UnifiedFalInterface';
+UnifiedFumiInterface.displayName = 'UnifiedFumiInterface';
 
-export default UnifiedFalInterface;
+export default UnifiedFumiInterface;

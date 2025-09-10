@@ -1,6 +1,6 @@
-# Dynamic Form System for Fal Models
+# Dynamic Form System for Fumi Models
 
-A comprehensive React component library for creating dynamic forms that adapt to different Fal AI model types. This system automatically generates appropriate input fields based on model requirements and capabilities.
+A comprehensive React component library for creating dynamic forms that adapt to different AI model types. This system automatically generates appropriate input fields based on model requirements and capabilities.
 
 ## Overview
 
@@ -8,18 +8,18 @@ The dynamic form system consists of several key components:
 
 - **Reusable Input Components**: Individual form field components for different input types
 - **Dynamic Form Renderer**: Orchestrates form rendering and state management
-- **Model-to-Form Converter**: Translates Fal model metadata into form configurations
+- **Model-to-Form Converter**: Translates model metadata into form configurations
 - **Form Validation**: Integrates with existing model validation logic
-- **FalModelForm**: Main component that ties everything together
+- **FumiModelForm**: Main component that ties everything together
 
 ## Components
 
-### FalModelForm
+### FumiModelForm
 
-The main component for generating forms based on Fal models.
+The main component for generating forms based on AI models.
 
 ```tsx
-import { FalModelForm } from '@/components/dynamic-forms';
+import { FumiModelForm } from '@/components/dynamic-forms';
 import { getModel } from '@/registry/model-registry';
 
 const model = getModel('stable-diffusion-xl-1.0');
@@ -37,7 +37,7 @@ function MyComponent() {
   };
 
   return (
-    <FalModelForm
+    <FumiModelForm
       model={model}
       onSubmit={handleSubmit}
       showModelInfo={true}
@@ -48,7 +48,7 @@ function MyComponent() {
 
 #### Props
 
-- `model`: ModelMetadata - The Fal model to generate a form for
+- `model`: ModelMetadata - The model to generate a form for
 - `onSubmit`: (modelInput: any) => void - Callback when form is submitted
 - `onChange?`: (data: FormData, errors: FormErrors) => void - Optional change callback
 - `disabled?`: boolean - Whether the form is disabled
@@ -235,7 +235,7 @@ interface BaseFieldConfig {
 
 ## Model Integration
 
-The system automatically converts Fal model metadata into form configurations:
+The system automatically converts model metadata into form configurations:
 
 ### Image Generation Models
 - Prompt and negative prompt textareas
@@ -352,7 +352,7 @@ Here's a complete example of using the dynamic form system:
 'use client';
 
 import { useState } from 'react';
-import { FalModelForm } from '@/components/dynamic-forms';
+import { FumiModelForm } from '@/components/dynamic-forms';
 import { getModel } from '@/registry/model-registry';
 
 export default function ImageGenerator() {
@@ -388,7 +388,7 @@ export default function ImageGenerator() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div>
-          <FalModelForm
+          <FumiModelForm
             model={model}
             onSubmit={handleSubmit}
             showModelInfo={true}
@@ -424,9 +424,9 @@ export default function ImageGenerator() {
 
 ## API Integration
 
-The form system is designed to work seamlessly with your existing Fal API endpoints. The `onSubmit` callback receives model input in the format expected by the Fal API for the specific model type.
+The form system is designed to work seamlessly with your existing API endpoints. The `onSubmit` callback receives model input in the format expected by the API for the specific model type.
 
-Form field names are automatically converted to the snake_case format expected by most Fal models (e.g., `negativePrompt` → `negative_prompt`).
+Form field names are automatically converted to the snake_case format expected by most models (e.g., `negativePrompt` → `negative_prompt`).
 
 ## Best Practices
 
@@ -441,9 +441,9 @@ Form field names are automatically converted to the snake_case format expected b
 
 If you're migrating from static forms:
 
-1. Replace your static form JSX with `FalModelForm`
+1. Replace your static form JSX with `FumiModelForm`
 2. Remove manual state management for form fields
 3. Update your submit handlers to work with the new `modelInput` format
 4. Use the model registry functions instead of hardcoded model configurations
 
-This dynamic form system provides a flexible, maintainable way to create forms for any Fal model while ensuring consistency and reducing boilerplate code.
+This dynamic form system provides a flexible, maintainable way to create forms for any AI model while ensuring consistency and reducing boilerplate code.

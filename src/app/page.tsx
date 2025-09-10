@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from 'react';
-import UnifiedFalInterface, { UnifiedFalInterfaceRef } from '@/components/UnifiedFalInterface';
+import UnifiedFumiInterface, { UnifiedFumiInterfaceRef } from '@/components/UnifiedFumiInterface';
 import { Card, CardContent } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/theme-toggle';
 import HistorySidebar from '@/components/history/HistorySidebar';
@@ -14,7 +14,7 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loadHistoryItem, setLoadHistoryItem] = useState<any>(null);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<any>(null);
-  const unifiedFalRef = useRef<UnifiedFalInterfaceRef>(null);
+  const unifiedFumiRef = useRef<UnifiedFumiInterfaceRef>(null);
   const [modalImage, setModalImage] = useState<{
     url: string;
     alt: string;
@@ -35,8 +35,8 @@ export default function Home() {
     setSelectedHistoryItem(null);
     
     // Reset the form to allow model reselection
-    if (unifiedFalRef.current) {
-      unifiedFalRef.current.resetForm();
+    if (unifiedFumiRef.current) {
+      unifiedFumiRef.current.resetForm();
     }
   };
 
@@ -158,8 +158,8 @@ export default function Home() {
                 <div className="container mx-auto px-4 py-8">
                   <Card className="max-w-4xl mx-auto">
                     <CardContent className="p-6 sm:p-10">
-                      <UnifiedFalInterface 
-                        ref={unifiedFalRef}
+                      <UnifiedFumiInterface 
+                        ref={unifiedFumiRef}
                         onImageClick={handleImageClick} 
                         loadHistoryItem={loadHistoryItem}
                         onHistoryItemLoaded={handleHistoryItemLoaded}
