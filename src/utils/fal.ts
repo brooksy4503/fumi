@@ -4,5 +4,5 @@
 export const HIDREAM_MODEL_ID = 'fal-ai/hidream-i1-dev';
 
 // API key for fal.ai - should be set in .env.local
-// Use NEXT_PUBLIC_ version for client components and regular version for server components
-export const FAL_KEY = process.env.FAL_KEY || process.env.NEXT_PUBLIC_FAL_KEY;
+// This is a server-side only key for security
+export const FAL_KEY = process.env.FAL_KEY;
