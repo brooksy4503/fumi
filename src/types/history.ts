@@ -46,11 +46,21 @@ export interface HistoryContextType {
     addToHistory: (item: Omit<HistoryItem, 'id' | 'timestamp'>) => void;
     removeFromHistory: (id: string) => void;
     clearHistory: () => void;
+    clearAllStorage: () => void;
+    emergencyClearStorage: () => void;
+    clearOldHistory: (daysToKeep?: number) => void;
     searchHistory: (query: string) => HistoryItem[];
     filterByModel: (modelId: string) => HistoryItem[];
     filterByCategory: (category: string) => HistoryItem[];
     exportHistory: () => string;
     importHistory: (data: string) => boolean;
+    getStorageInfo: () => {
+        itemCount: number;
+        estimatedSize: number;
+        maxItems: number;
+        maxSize: number;
+        usagePercentage: number;
+    } | null;
 }
 
 export interface HistoryFilter {

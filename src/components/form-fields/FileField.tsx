@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { FileFieldConfig, FormFieldProps } from '@/types/form-fields';
+import { falStorage, FalUploadResult, UploadProgress } from '@/services/fal-storage';
 
 interface FileFieldProps extends FormFieldProps {
   config: FileFieldConfig;
@@ -9,6 +10,9 @@ interface FileFieldProps extends FormFieldProps {
 
 export default function FileField({ config, value, onChange, error, disabled }: FileFieldProps) {
   const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const accept = config.accept || getAcceptString(config.type);
@@ -51,22 +55,63 @@ export default function FileField({ config, value, onChange, error, disabled }: 
     }
   };
 
-  const handleFiles = (files: File[]) => {
+  const handleFiles = useCallback(async (files: File[]) => {
     if (config.maxSize) {
       const oversizedFiles = files.filter(file => file.size > config.maxSize!);
       if (oversizedFiles.length > 0) {
-        // Handle error - files too large
+        setUploadError(`File size exceeds maximum allowed size of ${formatFileSize(config.maxSize!)}`);
         return;
       }
     }
 
-    if (multiple) {
-      const currentFiles = Array.isArray(value) ? value : [];
-      onChange([...currentFiles, ...files]);
+    // If uploadToStorage is enabled, upload files to Fal storage
+    if (config.uploadToStorage) {
+      setUploading(true);
+      setUploadError(null);
+      setUploadProgress(0);
+
+      try {
+        const uploadOptions = {
+          maxSize: config.maxSize,
+          allowedTypes: config.accept ? config.accept.split(',').map(type => type.trim()) : undefined,
+          onProgress: (progress: UploadProgress) => {
+            setUploadProgress(progress.progress);
+            config.uploadOptions?.onProgress?.(progress);
+          }
+        };
+
+        const results = await falStorage.uploadFiles(files, uploadOptions);
+        
+        // Convert upload results to URLs or keep as File objects based on config
+        const processedResults = results.map(result => result.url);
+
+        if (multiple) {
+          const currentFiles = Array.isArray(value) ? value : [];
+          onChange([...currentFiles, ...processedResults]);
+        } else {
+          onChange(processedResults[0]);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Upload failed';
+        setUploadError(errorMessage);
+        config.uploadOptions?.onProgress?.({
+          progress: 0,
+          status: 'error',
+          error: errorMessage
+        });
+      } finally {
+        setUploading(false);
+      }
     } else {
-      onChange(files[0]);
+      // Direct file handling without upload
+      if (multiple) {
+        const currentFiles = Array.isArray(value) ? value : [];
+        onChange([...currentFiles, ...files]);
+      } else {
+        onChange(files[0]);
+      }
     }
-  };
+  }, [config, value, onChange]);
 
   const removeFile = (index: number) => {
     if (Array.isArray(value)) {
@@ -85,20 +130,29 @@ export default function FileField({ config, value, onChange, error, disabled }: 
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const renderFilePreview = (file: File, index?: number) => {
-    const isImage = file.type.startsWith('image/');
-    const isVideo = file.type.startsWith('video/');
-    const isAudio = file.type.startsWith('audio/');
+  const renderFilePreview = (file: File | string, index?: number) => {
+    const isUrl = typeof file === 'string';
+    const fileName = isUrl ? `Uploaded file ${index !== undefined ? index + 1 : ''}` : file.name;
+    const fileSize = isUrl ? 'Uploaded' : formatFileSize(file.size);
+    const fileType = isUrl ? 'url' : file.type;
+    
+    const isImage = fileType.startsWith('image/');
+    const isVideo = fileType.startsWith('video/');
+    const isAudio = fileType.startsWith('audio/');
 
     return (
       <div key={index} className="flex items-center justify-between p-2 rounded border bg-card text-card-foreground">
         <div className="flex items-center space-x-3">
           {isImage && (
             <img
-              src={URL.createObjectURL(file)}
-              alt={file.name}
+              src={isUrl ? file : URL.createObjectURL(file as File)}
+              alt={fileName}
               className="w-10 h-10 object-cover rounded"
-              onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
+              onLoad={(e) => {
+                if (!isUrl) {
+                  URL.revokeObjectURL((e.target as HTMLImageElement).src);
+                }
+              }}
             />
           )}
           {isVideo && <div className="w-10 h-10 rounded flex items-center justify-center bg-secondary text-secondary-foreground">🎥</div>}
@@ -107,8 +161,11 @@ export default function FileField({ config, value, onChange, error, disabled }: 
             <div className="w-10 h-10 rounded flex items-center justify-center bg-secondary text-secondary-foreground">📄</div>
           )}
           <div>
-            <p className="text-sm font-medium">{file.name}</p>
-            <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+            <p className="text-sm font-medium">{fileName}</p>
+            <p className="text-xs text-muted-foreground">{fileSize}</p>
+            {isUrl && (
+              <p className="text-xs text-muted-foreground">URL: {file}</p>
+            )}
           </div>
         </div>
         <button
@@ -187,6 +244,30 @@ export default function FileField({ config, value, onChange, error, disabled }: 
         </div>
       </div>
 
+      {/* Upload Progress */}
+      {uploading && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span>Uploading...</span>
+            <span>{Math.round(uploadProgress)}%</span>
+          </div>
+          <div className="w-full bg-secondary rounded-full h-2">
+            <div 
+              className="bg-primary h-2 rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Upload Error */}
+      {uploadError && (
+        <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20">
+          <p className="text-sm text-destructive">{uploadError}</p>
+        </div>
+      )}
+
+      {/* Selected Files */}
       {files.length > 0 && (
         <div className="space-y-2">
           <p className="text-sm font-medium">
@@ -196,6 +277,7 @@ export default function FileField({ config, value, onChange, error, disabled }: 
         </div>
       )}
 
+      {/* Field Error */}
       {error && (
         <p className="text-sm text-destructive">{error}</p>
       )}

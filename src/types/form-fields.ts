@@ -88,6 +88,15 @@ export interface FileFieldConfig extends BaseFieldConfig {
     maxSize?: number;
     /** Allow multiple files */
     multiple?: boolean;
+    /** Whether to upload files to Fal storage and return URLs */
+    uploadToStorage?: boolean;
+    /** Upload options */
+    uploadOptions?: {
+        /** Callback for upload progress */
+        onProgress?: (progress: { progress: number; status: 'uploading' | 'completed' | 'error'; error?: string }) => void;
+        /** Custom filename */
+        filename?: string;
+    };
 }
 
 export interface BooleanFieldConfig extends BaseFieldConfig {

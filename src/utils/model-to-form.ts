@@ -1,4 +1,4 @@
-import { ModelMetadata, ImageGenerationModel, VideoGenerationModel, TextToSpeechModel, SpeechToTextModel, AudioGenerationModel } from '@/types/fal-models';
+import { ModelMetadata, ImageGenerationModel, VideoGenerationModel, TextToSpeechModel, SpeechToTextModel, AudioGenerationModel, ImageEditingModel } from '@/types/fal-models';
 import { FormConfig, FieldConfig } from '@/types/form-fields';
 
 /**
@@ -16,6 +16,9 @@ export function modelToFormConfig(model: ModelMetadata): FormConfig {
     switch (model.category) {
         case 'image-generation':
             config.sections = buildImageGenerationSections(model as ImageGenerationModel);
+            break;
+        case 'image-editing':
+            config.sections = buildImageEditingSections(model as ImageEditingModel);
             break;
         case 'video-generation':
             config.sections = buildVideoGenerationSections(model as VideoGenerationModel);
@@ -53,14 +56,20 @@ function buildImageGenerationSections(model: ImageGenerationModel): any[] {
         });
     }
 
-    if (model.supportedInputs.imagePrompt) {
+    if (model.supportedInputs.imagePrompt || model.capabilities.includes('image-editing')) {
         basicFields.push({
             id: 'imageUrl',
-            label: 'Image URL',
-            type: 'text',
-            description: 'Public URL of a reference image (required for some models)',
-            placeholder: 'https://example.com/your-image.jpg',
-            validation: { pattern: '^https?://' }
+            label: 'Reference Image',
+            type: 'image',
+            description: model.capabilities.includes('image-editing')
+                ? 'Upload a reference image to edit or generate from'
+                : 'Upload a reference image or provide a URL',
+            uploadToStorage: true,
+            uploadOptions: {
+                onProgress: (progress) => {
+                    console.log('Image upload progress:', progress);
+                }
+            }
         });
     }
 
@@ -197,6 +206,131 @@ function buildImageGenerationSections(model: ImageGenerationModel): any[] {
     return sections;
 }
 
+function buildImageEditingSections(model: ImageEditingModel): any[] {
+    const sections = [];
+
+    // Basic settings
+    const basicFields: FieldConfig[] = [
+        {
+            id: 'image_urls',
+            label: 'Reference Images',
+            type: 'image',
+            description: 'Upload the images you want to edit (multiple images supported)',
+            required: true,
+            multiple: true,
+            uploadToStorage: true,
+            uploadOptions: {
+                onProgress: (progress) => {
+                    console.log('Image upload progress:', progress);
+                }
+            }
+        },
+        {
+            id: 'prompt',
+            label: 'Edit Instructions',
+            type: 'textarea',
+            description: 'Describe how you want to edit the images',
+            required: true,
+            placeholder: 'Add a sunset in the background, change the color to blue...'
+        }
+    ];
+
+    if (model.supportedModes && model.supportedModes.length > 0) {
+        basicFields.push({
+            id: 'editMode',
+            label: 'Edit Mode',
+            type: 'select',
+            description: 'Choose the type of editing you want to perform',
+            options: model.supportedModes.map(mode => ({
+                value: mode,
+                label: mode.charAt(0).toUpperCase() + mode.slice(1).replace('-', ' ')
+            })),
+            defaultValue: model.supportedModes[0]
+        });
+    }
+
+    sections.push({
+        id: 'basic',
+        title: 'Basic Settings',
+        fields: basicFields
+    });
+
+    // Advanced settings
+    const advancedFields: FieldConfig[] = [];
+
+    if (model.supportedInputs && model.supportedInputs.length > 1) {
+        advancedFields.push({
+            id: 'inputFormat',
+            label: 'Input Format',
+            type: 'select',
+            description: 'Format of the input image',
+            options: model.supportedInputs.map(format => ({
+                value: format,
+                label: format.toUpperCase()
+            })),
+            defaultValue: model.supportedInputs[0]
+        });
+    }
+
+    if (model.supportedOutputs && model.supportedOutputs.length > 1) {
+        advancedFields.push({
+            id: 'outputFormat',
+            label: 'Output Format',
+            type: 'select',
+            description: 'Format of the output image',
+            options: model.supportedOutputs.map(format => ({
+                value: format,
+                label: format.toUpperCase()
+            })),
+            defaultValue: model.supportedOutputs[0]
+        });
+    }
+
+    advancedFields.push(
+        {
+            id: 'strength',
+            label: 'Edit Strength',
+            type: 'slider',
+            description: 'How strongly to apply the edit (0.0 = subtle, 1.0 = strong)',
+            min: 0.0,
+            max: 1.0,
+            step: 0.1,
+            defaultValue: 0.75
+        },
+        {
+            id: 'guidanceScale',
+            label: 'Guidance Scale',
+            type: 'slider',
+            description: 'How closely to follow the prompt (higher = more faithful to prompt)',
+            min: 1.0,
+            max: 20.0,
+            step: 0.5,
+            defaultValue: 7.5
+        },
+        {
+            id: 'numInferenceSteps',
+            label: 'Inference Steps',
+            type: 'number',
+            description: 'Number of denoising steps (more = higher quality, slower)',
+            min: 1,
+            max: 100,
+            defaultValue: 20
+        }
+    );
+
+    if (advancedFields.length > 0) {
+        sections.push({
+            id: 'advanced',
+            title: 'Advanced Settings',
+            collapsible: true,
+            collapsed: true,
+            fields: advancedFields
+        });
+    }
+
+    return sections;
+}
+
 function buildVideoGenerationSections(model: VideoGenerationModel): any[] {
     const sections = [];
 
@@ -212,13 +346,15 @@ function buildVideoGenerationSections(model: VideoGenerationModel): any[] {
     if (model.supportedInputs.imagePrompt && !model.supportedInputs.textPrompt && !model.supportedInputs.videoPrompt) {
         basicFields.push({
             id: 'imageUrl',
-            label: 'Image URL',
-            type: 'text',
-            description: 'Public URL of the source image for image-to-video',
+            label: 'Source Image',
+            type: 'image',
+            description: 'Upload the source image for image-to-video generation',
             required: true,
-            placeholder: 'https://example.com/your-image.jpg',
-            validation: {
-                pattern: '^https?://'
+            uploadToStorage: true,
+            uploadOptions: {
+                onProgress: (progress) => {
+                    console.log('Image upload progress:', progress);
+                }
             }
         });
     }
@@ -361,11 +497,17 @@ function buildCustomVideoGenerationSections(model: VideoGenerationModel): any[] 
                 field.type = 'textarea';
                 field.placeholder = 'A woman looks into the camera, breathes in, then exclaims energetically...';
             } else if (fieldId === 'image_url') {
-                field.placeholder = 'https://example.com/your-image.jpg';
-                field.validation = {
-                    pattern: '^https?://'
-                };
-            } else if (fieldId === 'generate_audio') {
+                (field as any).type = 'image';
+                (field as any).accept = 'image/*';
+                (field as any).maxSize = 8 * 1024 * 1024; // 8MB max size
+                (field as any).uploadToStorage = true;
+                // Update description based on model
+                if (model.id.includes('veo3')) {
+                    field.description = 'Upload an image to animate (720p or higher, 16:9 aspect ratio)';
+                } else {
+                    field.description = 'Upload an image to use as the first frame of the video';
+                }
+            } else if (fieldId === 'generate_audio' || fieldId === 'sync_mode') {
                 field.type = 'boolean';
             }
 
@@ -447,19 +589,14 @@ function buildTextToSpeechSections(model: TextToSpeechModel): any[] {
     if (model.requiresAudioUrl) {
         basicFields.push({
             id: 'audio_url',
-            label: 'Conditioning Audio URL',
-            type: 'text',
-            description: `URL to the conditioning audio file (minimum ${model.minAudioDuration || 30} seconds)`,
+            label: 'Conditioning Audio',
+            type: 'audio',
+            description: `Upload conditioning audio file (minimum ${model.minAudioDuration || 30} seconds)`,
             required: true,
-            placeholder: 'https://example.com/audio.mp3',
-            validation: {
-                pattern: '^https?://.*\\.(mp3|wav|flac|ogg|m4a)$',
-                custom: (value: string) => {
-                    if (!value) return 'Audio URL is required';
-                    if (!value.match(/^https?:\/\/.*\.(mp3|wav|flac|ogg|m4a)$/i)) {
-                        return 'Please provide a valid audio file URL';
-                    }
-                    return null;
+            uploadToStorage: true,
+            uploadOptions: {
+                onProgress: (progress) => {
+                    console.log('Audio upload progress:', progress);
                 }
             }
         });
@@ -537,7 +674,13 @@ function buildSpeechToTextSections(model: SpeechToTextModel): any[] {
             type: 'audio',
             description: 'Upload an audio file for transcription',
             required: true,
-            accept: model.supportedFormats.join(',')
+            accept: model.supportedFormats.join(','),
+            uploadToStorage: true,
+            uploadOptions: {
+                onProgress: (progress) => {
+                    console.log('Audio upload progress:', progress);
+                }
+            }
         }
     ];
 

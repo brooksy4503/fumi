@@ -17,6 +17,11 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import FileField from './form-fields/FileField';
+import DragDropFileUpload from './DragDropFileUpload';
+import ImageUploadPreview from './ImageUploadPreview';
+import { FileFieldConfig } from '@/types/form-fields';
+import { UploadProgress } from '@/services/fal-storage';
 
 interface ShadcnDynamicFormProps {
   config: FormConfig;
@@ -341,6 +346,81 @@ export default function ShadcnDynamicForm({
             />
             {isTouched && error && <p className="text-destructive text-sm">{error}</p>}
           </div>
+        );
+
+      case 'file':
+      case 'image':
+      case 'audio':
+      case 'video':
+        const fileFieldConfig = field as FileFieldConfig;
+        
+        // Use ImageUploadPreview for image fields with multiple images
+        if (field.type === 'image' && fileFieldConfig.multiple) {
+          return (
+            <div className="grid gap-2">
+              <Label htmlFor={field.id}>
+                {field.label}
+                {field.required && <span className="text-destructive ml-1">*</span>}
+              </Label>
+              {field.description && (
+                <p className="text-muted-foreground text-sm">{field.description}</p>
+              )}
+              <ImageUploadPreview
+                accept={fileFieldConfig.accept}
+                maxSize={fileFieldConfig.maxSize}
+                multiple={fileFieldConfig.multiple}
+                maxImages={fileFieldConfig.multiple ? 6 : 1}
+                uploadToStorage={fileFieldConfig.uploadToStorage}
+                onImagesChange={(images) => handleFieldChange(field.id, images)}
+                onUploadProgress={(progress: UploadProgress) => {
+                  console.log(`${field.id} upload progress:`, progress);
+                }}
+                disabled={disabled || field.disabled}
+              />
+              {isTouched && error && <p className="text-destructive text-sm">{error}</p>}
+            </div>
+          );
+        }
+        
+        // Use DragDropFileUpload for single file uploads or non-image files
+        if (fileFieldConfig.uploadToStorage && !fileFieldConfig.multiple) {
+          return (
+            <div className="grid gap-2">
+              <Label htmlFor={field.id}>
+                {field.label}
+                {field.required && <span className="text-destructive ml-1">*</span>}
+              </Label>
+              {field.description && (
+                <p className="text-muted-foreground text-sm">{field.description}</p>
+              )}
+              <DragDropFileUpload
+                accept={fileFieldConfig.accept}
+                maxSize={fileFieldConfig.maxSize}
+                multiple={fileFieldConfig.multiple}
+                uploadToStorage={fileFieldConfig.uploadToStorage}
+                value={value}
+                onFilesChange={(files) => handleFieldChange(field.id, files)}
+                onUploadProgress={(progress: UploadProgress) => {
+                  console.log(`${field.id} upload progress:`, progress);
+                }}
+                disabled={disabled || field.disabled}
+                placeholder={`Drop ${field.type} files here or click to browse`}
+              />
+              {isTouched && error && <p className="text-destructive text-sm">{error}</p>}
+            </div>
+          );
+        }
+        
+        // Use FileField for all other cases
+        return (
+          <FileField
+            config={fileFieldConfig}
+            value={value}
+            onChange={(newValue) => handleFieldChange(field.id, newValue)}
+            onBlur={() => handleFieldBlur(field.id)}
+            error={isTouched ? error : undefined}
+            disabled={disabled || field.disabled}
+          />
         );
 
       default:

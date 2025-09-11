@@ -248,6 +248,14 @@ export async function POST(request: Request) {
       if (!finalInput.duration) finalInput.duration = '8s';
       if (finalInput.generate_audio === undefined) finalInput.generate_audio = true;
       if (!finalInput.resolution) finalInput.resolution = '720p';
+    } else if (actualModelId === 'fal-ai/gemini-25-flash-image/edit') {
+      // Gemini editing model: expects image_urls array and prompt
+      finalInput = {
+        prompt: baseInput.prompt,
+        image_urls: normalizedInputs.image_urls || [],
+        num_images: normalizedInputs.num_images || 1,
+        output_format: normalizedInputs.output_format || 'jpeg'
+      };
     } else if (actualModelId.startsWith('fal-ai/flux')) {
       // FLUX models: start with required parameters
       finalInput.prompt = baseInput.prompt;

@@ -32,6 +32,12 @@ export function HistoryProvider({ children }: HistoryProviderProps) {
       try {
         const storedHistory = storage.getAllHistory();
         setHistory(storedHistory);
+        
+        // Automatically clear old history items to prevent quota issues
+        // Keep only last 7 days of history
+        storage.clearOldHistory(7);
+        const cleanedHistory = storage.getAllHistory();
+        setHistory(cleanedHistory);
       } catch (error) {
         console.error('Failed to load history:', error);
       } finally {
@@ -79,6 +85,40 @@ export function HistoryProvider({ children }: HistoryProviderProps) {
       setHistory([]);
     } catch (error) {
       console.error('Failed to clear history:', error);
+    }
+  }, [storage]);
+
+  const clearAllStorage = useCallback(() => {
+    if (!storage) return;
+    
+    try {
+      storage.clearAllStorage();
+      setHistory([]);
+    } catch (error) {
+      console.error('Failed to clear all storage:', error);
+    }
+  }, [storage]);
+
+  const emergencyClearStorage = useCallback(() => {
+    if (!storage) return;
+    
+    try {
+      storage.emergencyClearStorage();
+      setHistory([]);
+    } catch (error) {
+      console.error('Failed to emergency clear storage:', error);
+    }
+  }, [storage]);
+
+  const clearOldHistory = useCallback((daysToKeep: number = 7) => {
+    if (!storage) return;
+    
+    try {
+      storage.clearOldHistory(daysToKeep);
+      const updatedHistory = storage.getAllHistory();
+      setHistory(updatedHistory);
+    } catch (error) {
+      console.error('Failed to clear old history:', error);
     }
   }, [storage]);
 
@@ -142,17 +182,32 @@ export function HistoryProvider({ children }: HistoryProviderProps) {
     }
   }, [storage]);
 
+  const getStorageInfo = useCallback(() => {
+    if (!storage) return null;
+    
+    try {
+      return storage.getStorageInfo();
+    } catch (error) {
+      console.error('Failed to get storage info:', error);
+      return null;
+    }
+  }, [storage]);
+
   const value: HistoryContextType = {
     history,
     isLoading,
     addToHistory,
     removeFromHistory,
     clearHistory,
+    clearAllStorage,
+    emergencyClearStorage,
+    clearOldHistory,
     searchHistory,
     filterByModel,
     filterByCategory,
     exportHistory,
     importHistory,
+    getStorageInfo,
   };
 
   return (

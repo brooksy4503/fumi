@@ -118,7 +118,7 @@ export default function Home() {
               Generate images, videos, audio, and text with AI models
             </p>
           </div>
-          <div className="justify-self-end">
+          <div className="justify-self-end flex items-center gap-2">
             <ThemeToggle />
           </div>
         </div>

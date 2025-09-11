@@ -167,7 +167,7 @@ const staticRegistry: Record<string, ModelMetadata> = {
     'fal-ai/gemini-25-flash-image': {
         id: 'fal-ai/gemini-25-flash-image',
         name: 'Gemini 2.5 Flash Image',
-        description: 'Google\'s state-of-the-art image generation and editing model with high-quality outputs',
+        description: 'Google\'s state-of-the-art image generation model with high-quality outputs',
         category: 'image-generation',
         version: '2.5',
         provider: 'Google',
@@ -198,6 +198,35 @@ const staticRegistry: Record<string, ModelMetadata> = {
             batchSize: 10,
         },
     } as ImageGenerationModel,
+
+    // ============================================================================
+    // IMAGE EDITING MODELS
+    // ============================================================================
+
+    'fal-ai/gemini-25-flash-image/edit': {
+        id: 'fal-ai/gemini-25-flash-image/edit',
+        name: 'Gemini 2.5 Flash Image Edit',
+        description: 'Google\'s state-of-the-art image editing model for editing multiple images',
+        category: 'image-editing',
+        version: '2.5',
+        provider: 'Google',
+        capabilities: ['image-editing'],
+        limits: {
+            maxInputSize: '2048x2048',
+            maxOutputSize: '2048x2048',
+            rateLimit: {
+                requestsPerMinute: 30,
+                requestsPerHour: 300,
+            },
+            costPerRequest: 0.03,
+        },
+        requiresAuth: true,
+        status: 'active',
+        supportedModes: ['inpaint', 'outpaint', 'super-resolution', 'colorize', 'restore'],
+        maxResolution: '2048x2048',
+        supportedInputs: ['png', 'jpg', 'jpeg', 'webp'],
+        supportedOutputs: ['png', 'jpg', 'jpeg', 'webp'],
+    } as ImageEditingModel,
 
     // ============================================================================
     // VIDEO GENERATION MODELS
@@ -343,6 +372,76 @@ const staticRegistry: Record<string, ModelMetadata> = {
                 default: '720p',
                 enum: ['720p', '1080p'],
                 description: 'Resolution of the generated video'
+            }
+        }
+    } as VideoGenerationModel,
+
+    'decart/lucy-14b/image-to-video': {
+        id: 'decart/lucy-14b/image-to-video',
+        name: 'Lucy-14B Image to Video',
+        description: 'Lucy-14B delivers lightning fast performance that redefines what\'s possible with image-to-video AI',
+        category: 'video-generation',
+        version: '14b',
+        provider: 'Decart',
+        capabilities: ['image-to-video'],
+        limits: {
+            maxInputSize: '8MB',
+            maxOutputSize: '720p',
+            rateLimit: {
+                requestsPerMinute: 20,
+                requestsPerHour: 200,
+            },
+            costPerRequest: 0.05, // Estimated cost based on similar models
+        },
+        requiresAuth: true,
+        status: 'active',
+        supportedInputs: {
+            textPrompt: true,
+            videoPrompt: false,
+            imagePrompt: true,
+            negativePrompt: false,
+            durations: [],
+            dimensions: false, // Fixed aspect ratio
+            aspectRatios: ['16:9', '9:16'],
+            fps: [24], // Standard frame rate
+        },
+        supportedOutputs: {
+            formats: ['mp4'],
+            maxResolution: '720p',
+            maxDuration: 8,
+            batchSize: 1,
+        },
+        // Custom input schema for Lucy-14B
+        customInputSchema: {
+            prompt: {
+                type: 'string',
+                required: true,
+                description: 'Text description of the desired video content'
+            },
+            image_url: {
+                type: 'string',
+                required: true,
+                description: 'URL of the image to use as the first frame'
+            },
+            resolution: {
+                type: 'string',
+                required: false,
+                default: '720p',
+                enum: ['720p'],
+                description: 'Resolution of the generated video'
+            },
+            aspect_ratio: {
+                type: 'string',
+                required: false,
+                default: '16:9',
+                enum: ['9:16', '16:9'],
+                description: 'Aspect ratio of the generated video'
+            },
+            sync_mode: {
+                type: 'boolean',
+                required: false,
+                default: true,
+                description: 'If set to true, the function will wait for the image to be generated and uploaded before returning the response'
             }
         }
     } as VideoGenerationModel,
@@ -652,7 +751,9 @@ export async function validateInput(id: string, input: ModelInput): Promise<{ va
         }
         case 'image-editing': {
             const editInput = input as any;
-            if (!editInput.imageUrl) errors.push('Image URL is required');
+            if (!editInput.image_urls || !Array.isArray(editInput.image_urls) || editInput.image_urls.length === 0) {
+                errors.push('Image URLs are required');
+            }
             break;
         }
     }
