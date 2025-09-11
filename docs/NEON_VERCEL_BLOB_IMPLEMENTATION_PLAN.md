@@ -3,6 +3,16 @@
 ## **Overview**
 This document outlines the complete implementation plan for replacing localStorage with Neon database + Vercel Blob Storage to handle unlimited video storage and large media files.
 
+## **Auth Integration Touchpoints**
+
+- **Identity requirement**: `userId` must be present on all `history_items` and `media_files`. Plan to make it non-nullable after backfilling. For legacy/anonymous items, decide whether to associate with a pseudo user or restrict access until claimed.
+- **Route protection**: Require authentication on all DB-backed and upload routes (`/api/history/*`, `/api/upload`). Enforce in middleware and in the handlers/server components.
+- **Authorization rules**: Scope all DB queries and mutations by the authenticated `userId`. Derive `userId` from the session on the server; never trust a client-sent `userId`.
+- **Blob scoping**: Generate short‑lived client direct‑upload URLs server-side with a per‑user prefix `users/{userId}/{yyyy}/{mm}/{uuid}.{ext}`. When listing or deleting, validate ownership via DB rows.
+- **Rate limiting**: Apply per‑user limits on mutation/upload endpoints (fallback to IP for anonymous if supported).
+- **Edge compatibility**: Verify the auth library supports Edge runtime. If not, set `export const runtime = 'nodejs'` for the affected routes or perform auth checks in Node-compatible layers.
+- **See also**: `docs/AUTH_INTEGRATION.md` for full auth setup and examples (using Better Auth).
+
 ## **Phase 1: Setup & Dependencies**
 
 ### **1.1 Install Required Dependencies**
@@ -310,6 +320,7 @@ export async function DELETE() // Clear all history
 // - Use rate limiting on mutating endpoints
 // - Prefer cursor-based pagination: /api/history?cursor=<id>&limit=50
 // - Support idempotency keys on POST/PUT via header: Idempotency-Key
+// - Require auth; derive userId from server session, never from client input
 ```
 
 ### **4.2 Individual History Item API**
@@ -330,6 +341,7 @@ export async function DELETE() // Delete item
 // Return structured response with: { uploadUrl | blobUrl, signedUrl, checksumSha256, width, height, duration }
 // Use deterministic paths: users/{userId}/{yyyy}/{mm}/{uuid}.{ext}
 // When listing blobs, paginate using Blob API cursors
+// Require auth; userId is derived from server session, not request body
 ```
 
 ### **4.4 Search & Filter API**
@@ -483,6 +495,12 @@ import { BlobStorageService } from '@/services/blob-storage';
  - [ ] Zod validation in API routes
  - [ ] Direct-to-Blob client uploads (private by default) with signed URLs
  - [ ] Rate limiting on upload and mutation endpoints
+ - [ ] Integrate auth provider and expose userId on server
+ - [ ] Protect `/api/history/*` and `/api/upload` with auth
+ - [ ] Scope all DB queries/mutations by authenticated userId
+ - [ ] Enforce per-user blob path prefix and ownership checks
+ - [ ] Backfill userId for legacy rows; decide anonymous strategy
+ - [ ] Verify auth library compatibility with Edge or set Node runtime per route
 
 ## **File Structure Changes**
 
