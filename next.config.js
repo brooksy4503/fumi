@@ -13,6 +13,11 @@ const nextConfig = {
         hostname: 'v3.fal.media',
         pathname: '/files/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'v3b.fal.media',
+        pathname: '/files/**',
+      },
     ],
   },
   eslint: {

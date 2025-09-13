@@ -290,7 +290,7 @@ export interface VideoGenerationModel extends BaseModelMetadata {
     };
     /** Custom input schema for models with specific parameter requirements */
     customInputSchema?: Record<string, {
-        type: 'string' | 'number' | 'boolean';
+        type: 'string' | 'number' | 'boolean' | 'array';
         required: boolean;
         default?: any;
         enum?: any[];
@@ -623,6 +623,16 @@ export interface ImageEditingModel extends BaseModelMetadata {
     supportedInputs: ('png' | 'jpg' | 'webp')[];
     /** Supported output formats */
     supportedOutputs: ('png' | 'jpg' | 'webp')[];
+    /** Custom input schema for models with specific parameter requirements */
+    customInputSchema?: Record<string, {
+        type: 'string' | 'number' | 'boolean' | 'array';
+        required: boolean;
+        default?: any;
+        enum?: any[];
+        minimum?: number;
+        maximum?: number;
+        description: string;
+    }>;
 }
 
 // ============================================================================

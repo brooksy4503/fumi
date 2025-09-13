@@ -199,6 +199,41 @@ const staticRegistry: Record<string, ModelMetadata> = {
         },
     } as ImageGenerationModel,
 
+    'fal-ai/bytedance/seedream/v4/text-to-image': {
+        id: 'fal-ai/bytedance/seedream/v4/text-to-image',
+        name: 'Seedream v4',
+        description: 'Bytedance\'s advanced text-to-image generation model with high-quality outputs',
+        category: 'image-generation',
+        version: '4.0',
+        provider: 'Bytedance',
+        capabilities: ['text-to-image'],
+        limits: {
+            maxInputSize: '1024x1024',
+            maxOutputSize: '1024x1024',
+            rateLimit: {
+                requestsPerMinute: 20,
+                requestsPerHour: 200,
+            },
+            costPerRequest: 0.025,
+        },
+        requiresAuth: true,
+        status: 'active',
+        supportedInputs: {
+            textPrompt: true,
+            imagePrompt: false,
+            negativePrompt: true,
+            dimensions: true,
+            aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+            styles: ['realistic', 'artistic', 'photorealistic'],
+            controlNet: false,
+        },
+        supportedOutputs: {
+            formats: ['png', 'jpg', 'webp'],
+            maxResolution: '1024x1024',
+            batchSize: 1,
+        },
+    } as ImageGenerationModel,
+
     // ============================================================================
     // IMAGE EDITING MODELS
     // ============================================================================
@@ -226,6 +261,66 @@ const staticRegistry: Record<string, ModelMetadata> = {
         maxResolution: '2048x2048',
         supportedInputs: ['png', 'jpg', 'jpeg', 'webp'],
         supportedOutputs: ['png', 'jpg', 'jpeg', 'webp'],
+    } as ImageEditingModel,
+
+    'fal-ai/bytedance/seedream/v4/edit': {
+        id: 'fal-ai/bytedance/seedream/v4/edit',
+        name: 'Seedream v4 Image Edit',
+        description: 'Bytedance\'s advanced image editing model based on Seedream v4 with high-quality outputs',
+        category: 'image-editing',
+        version: '4.0',
+        provider: 'Bytedance',
+        capabilities: ['image-editing'],
+        limits: {
+            maxInputSize: '4096x4096',
+            maxOutputSize: '4096x4096',
+            rateLimit: {
+                requestsPerMinute: 20,
+                requestsPerHour: 200,
+            },
+            costPerRequest: 0.025,
+        },
+        requiresAuth: true,
+        status: 'active',
+        supportedModes: ['inpaint', 'outpaint', 'super-resolution'],
+        maxResolution: '4096x4096',
+        supportedInputs: ['png', 'jpg', 'webp'],
+        supportedOutputs: ['png', 'jpg', 'webp'],
+        // Custom input schema for Seedream v4 Edit
+        customInputSchema: {
+            prompt: {
+                type: 'string',
+                required: true,
+                description: 'The text prompt used to edit the image'
+            },
+            image_urls: {
+                type: 'array',
+                required: true,
+                description: 'List of URLs of input images for editing (up to 10 images allowed)'
+            },
+            image_size: {
+                type: 'string',
+                required: false,
+                default: 'square_hd',
+                enum: ['square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9'],
+                description: 'The size of the generated image. Width and height must be between 1024 and 4096.'
+            },
+            // Support for custom dimensions
+            width: {
+                type: 'number',
+                required: false,
+                minimum: 1024,
+                maximum: 4096,
+                description: 'Custom width for the image (overrides image_size if provided)'
+            },
+            height: {
+                type: 'number',
+                required: false,
+                minimum: 1024,
+                maximum: 4096,
+                description: 'Custom height for the image (overrides image_size if provided)'
+            }
+        }
     } as ImageEditingModel,
 
     // ============================================================================
@@ -639,12 +734,28 @@ export async function getDefaultParams(id: string): Promise<Partial<ModelInput> 
                 format: 'mp3',
                 sampleRate: 44100,
             };
-        case 'image-editing':
-            return {
-                strength: 0.75,
-                guidanceScale: 7.5,
-                numInferenceSteps: 20,
-            };
+        case 'image-editing': {
+            const editModel = model as ImageEditingModel;
+
+            // Check if this model has a custom input schema
+            if (editModel.customInputSchema) {
+                // For custom schemas, return defaults from the schema
+                const defaults: any = {};
+                Object.entries(editModel.customInputSchema).forEach(([fieldId, fieldSchema]) => {
+                    if (fieldSchema.default !== undefined) {
+                        defaults[fieldId] = fieldSchema.default;
+                    }
+                });
+                return defaults;
+            } else {
+                // Standard image editing defaults
+                return {
+                    strength: 0.75,
+                    guidanceScale: 7.5,
+                    numInferenceSteps: 20,
+                };
+            }
+        }
         default:
             return {};
     }
@@ -751,8 +862,32 @@ export async function validateInput(id: string, input: ModelInput): Promise<{ va
         }
         case 'image-editing': {
             const editInput = input as any;
-            if (!editInput.image_urls || !Array.isArray(editInput.image_urls) || editInput.image_urls.length === 0) {
-                errors.push('Image URLs are required');
+            const editModel = model as ImageEditingModel;
+
+            // Check if this model has a custom input schema
+            if (editModel.customInputSchema) {
+                // For custom schemas, validate based on the schema requirements
+                Object.entries(editModel.customInputSchema).forEach(([fieldId, fieldSchema]) => {
+                    if (fieldSchema.required) {
+                        if (fieldSchema.type === 'array') {
+                            // For array fields, check if it's a non-empty array
+                            if (!editInput[fieldId] || !Array.isArray(editInput[fieldId]) || editInput[fieldId].length === 0) {
+                                errors.push(`${fieldSchema.description} is required`);
+                            }
+                        } else {
+                            // For other fields, check if they exist and are not empty
+                            if (!editInput[fieldId] || editInput[fieldId] === '') {
+                                const fieldName = fieldSchema.description.split('.')[0] || fieldId;
+                                errors.push(`${fieldName} is required`);
+                            }
+                        }
+                    }
+                });
+            } else {
+                // Standard image editing validation
+                if (!editInput.image_urls || !Array.isArray(editInput.image_urls) || editInput.image_urls.length === 0) {
+                    errors.push('Image URLs are required');
+                }
             }
             break;
         }

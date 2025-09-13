@@ -142,6 +142,31 @@ export function formDataToModelInput(
             if (formData.genre) input.genre = formData.genre;
             break;
 
+        case 'image-editing': {
+            const editModel = model as any;
+
+            // Check if this model has a custom input schema (like Seedream v4 Edit)
+            if (editModel.customInputSchema) {
+                // For custom schemas, use the field names directly from the form data
+                Object.entries(formData).forEach(([key, value]) => {
+                    if (value !== undefined && value !== null && value !== '') {
+                        input[key] = value;
+                    }
+                });
+            } else {
+                // Standard image editing mapping
+                if (formData.image_urls) input.image_urls = formData.image_urls;
+                if (formData.prompt) input.prompt = formData.prompt;
+                if (formData.editMode) input.edit_mode = formData.editMode;
+                if (formData.strength) input.strength = Number(formData.strength);
+                if (formData.guidanceScale) input.guidance_scale = Number(formData.guidanceScale);
+                if (formData.numInferenceSteps) input.num_inference_steps = Number(formData.numInferenceSteps);
+                if (formData.inputFormat) input.input_format = formData.inputFormat;
+                if (formData.outputFormat) input.output_format = formData.outputFormat;
+            }
+            break;
+        }
+
         default:
             // Generic mapping for unsupported model types
             Object.assign(input, formData);
@@ -232,11 +257,11 @@ export async function getFormDefaults(model: ModelMetadata): Promise<FormData> {
     // Convert model defaults to form format
     const formDefaults: FormData = {};
 
-    // Check if this model has a custom input schema (like Veo 3 Fast)
-    const videoModel = model as any;
-    if (model.category === 'video-generation' && videoModel.customInputSchema) {
+    // Check if this model has a custom input schema (like Veo 3 Fast or Seedream v4 Edit)
+    const customModel = model as any;
+    if ((model.category === 'video-generation' || model.category === 'image-editing') && customModel.customInputSchema) {
         // For custom schemas, use the field names directly from the schema
-        Object.entries(videoModel.customInputSchema).forEach(([fieldId, fieldSchema]: [string, any]) => {
+        Object.entries(customModel.customInputSchema).forEach(([fieldId, fieldSchema]: [string, any]) => {
             if (fieldSchema.default !== undefined) {
                 formDefaults[fieldId] = fieldSchema.default;
             }

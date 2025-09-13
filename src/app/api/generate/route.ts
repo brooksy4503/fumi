@@ -51,6 +51,12 @@ function validateResponse(category: string, response: FalApiResponse): string | 
       }
       break;
 
+    case 'image-editing':
+      if (!response.data?.images || response.data.images.length === 0) {
+        return 'No images returned in response';
+      }
+      break;
+
     case 'video-generation':
       if (!response.data?.videos && !response.data?.video) {
         return 'No video content returned in response';
@@ -132,6 +138,8 @@ export async function POST(request: Request) {
       'stable-video-diffusion': 'fal-ai/stable-video-diffusion',
       'vibevoice': 'fal-ai/vibevoice',
       'xtts': 'fal-ai/xtts',
+      // Seedream v4 Edit variants
+      'fal-ai/bytedance/seedream/v4/edit/api': 'fal-ai/bytedance/seedream/v4/edit',
     };
 
     // Map alias to actual model ID if needed
@@ -256,6 +264,29 @@ export async function POST(request: Request) {
         num_images: normalizedInputs.num_images || 1,
         output_format: normalizedInputs.output_format || 'jpeg'
       };
+    } else if (actualModelId === 'fal-ai/bytedance/seedream/v4/edit') {
+      // Seedream v4 edit: expects image_urls array, prompt, and optional image_size (enum) or custom { width, height }
+      finalInput = {
+        prompt: baseInput.prompt,
+        image_urls: normalizedInputs.image_urls || [],
+      };
+
+      // Prefer explicit image_size enum; otherwise, build object from width/height if provided together
+      if (normalizedInputs.image_size) {
+        finalInput.image_size = normalizedInputs.image_size;
+      } else if (normalizedInputs.width && normalizedInputs.height) {
+        finalInput.image_size = {
+          width: normalizedInputs.width,
+          height: normalizedInputs.height,
+        };
+      }
+
+      // Forward supported optional parameters
+      if (normalizedInputs.num_images !== undefined) finalInput.num_images = normalizedInputs.num_images;
+      if (normalizedInputs.max_images !== undefined) finalInput.max_images = normalizedInputs.max_images;
+      if (normalizedInputs.seed !== undefined) finalInput.seed = normalizedInputs.seed;
+      if (normalizedInputs.sync_mode !== undefined) finalInput.sync_mode = normalizedInputs.sync_mode;
+      if (normalizedInputs.enable_safety_checker !== undefined) finalInput.enable_safety_checker = normalizedInputs.enable_safety_checker;
     } else if (actualModelId.startsWith('fal-ai/flux')) {
       // FLUX models: start with required parameters
       finalInput.prompt = baseInput.prompt;

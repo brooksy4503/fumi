@@ -207,6 +207,11 @@ function buildImageGenerationSections(model: ImageGenerationModel): any[] {
 }
 
 function buildImageEditingSections(model: ImageEditingModel): any[] {
+    // Check if this model has a custom input schema (like Seedream v4 Edit)
+    if (model.customInputSchema) {
+        return buildCustomImageEditingSections(model);
+    }
+
     const sections = [];
 
     // Basic settings
@@ -325,6 +330,66 @@ function buildImageEditingSections(model: ImageEditingModel): any[] {
             collapsible: true,
             collapsed: true,
             fields: advancedFields
+        });
+    }
+
+    return sections;
+}
+
+function buildCustomImageEditingSections(model: ImageEditingModel): any[] {
+    const sections = [];
+    const basicFields: FieldConfig[] = [];
+
+    // Build fields based on custom input schema
+    if (model.customInputSchema) {
+        Object.entries(model.customInputSchema).forEach(([fieldId, fieldSchema]) => {
+            const field: FieldConfig = {
+                id: fieldId,
+                label: fieldSchema.description.split('.')[0] || fieldId,
+                type: fieldSchema.type === 'string' ? 'text' : fieldSchema.type as any,
+                description: fieldSchema.description,
+                required: fieldSchema.required,
+                defaultValue: fieldSchema.default
+            };
+
+            // Handle specific field types
+            if (fieldSchema.type === 'string' && fieldSchema.enum) {
+                (field as any).type = 'select';
+                (field as any).options = fieldSchema.enum.map(value => ({
+                    value: value,
+                    label: value
+                }));
+            }
+
+            // Special handling for specific fields
+            if (fieldId === 'prompt') {
+                field.type = 'textarea';
+                field.placeholder = 'Describe how you want to edit the image...';
+            } else if (fieldId === 'image_urls') {
+                (field as any).type = 'image';
+                (field as any).multiple = true;
+                (field as any).uploadToStorage = true;
+                (field as any).uploadOptions = {
+                    onProgress: (progress) => {
+                        console.log('Image upload progress:', progress);
+                    }
+                };
+            } else if (fieldId === 'width' || fieldId === 'height') {
+                (field as any).type = 'number';
+                (field as any).min = fieldSchema.minimum;
+                (field as any).max = fieldSchema.maximum;
+                (field as any).unit = 'px';
+            }
+
+            basicFields.push(field);
+        });
+    }
+
+    if (basicFields.length > 0) {
+        sections.push({
+            id: 'basic',
+            title: 'Basic Settings',
+            fields: basicFields
         });
     }
 
@@ -474,10 +539,15 @@ function buildCustomVideoGenerationSections(model: VideoGenerationModel): any[] 
     // Build fields based on custom input schema
     if (model.customInputSchema) {
         Object.entries(model.customInputSchema).forEach(([fieldId, fieldSchema]) => {
+            // Skip array types as they're handled separately
+            if (fieldSchema.type === 'array') {
+                return;
+            }
+
             const field: FieldConfig = {
                 id: fieldId,
                 label: fieldSchema.description.split('.')[0] || fieldId,
-                type: fieldSchema.type === 'string' ? 'text' : fieldSchema.type,
+                type: fieldSchema.type === 'string' ? 'text' : fieldSchema.type as any,
                 description: fieldSchema.description,
                 required: fieldSchema.required,
                 defaultValue: fieldSchema.default
